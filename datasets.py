@@ -71,8 +71,8 @@ valid_tfms = transforms.Compose([
 ])
 
 def load_local_data(args):
-    base_path = Path('/Users/vskarich/PycharmProjects/CS230_Scratch/local_data/images/Flicker8k_Dataset')
-    df = pd.read_csv('/Users/vskarich/PycharmProjects/CS230_Scratch/local_data/captions/captions.csv', delimiter=',')
+    base_path = Path('/Users/vskarich/CS230_Scratch_Large/local_data/images/Flicker8k_Dataset')
+    df = pd.read_csv('/Users/vskarich/CS230_Scratch_Large/local_data/captions/captions.csv', delimiter=',')
     df.dropna(axis=0, how='any', inplace=True)
     df['image'] = df['image'].map(lambda x:base_path / x.strip())
     df['caption'] = df['caption'].map(lambda x:x.strip().lower())

@@ -75,7 +75,7 @@ if __name__ == "__main__":
         freeze_epochs_all=args.unfreeze_all,
         lr=args.lr,
         device=get_device(),
-        model_path=Path('captioner'),
+        model_path=Path('/Users/vskarich/CS230_Scratch_Large/captioner'),
         batch_size=args.batch_size
     )
 
