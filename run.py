@@ -1,65 +1,95 @@
+import warnings
+warnings.filterwarnings("ignore")
+from datasets import load_local_data, load_coco_data, make_train_dataloader, make_validation_dataloader
+
 
 import argparse
+import random
+from pathlib import Path
+from types import SimpleNamespace
+import numpy as np
+import torch
+
+from trainer import Trainer
+
+def get_device():
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+    print(f"Using device: {device}")
+    return device
+
+
+
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--fine-tune-mode", type=str,
-                        help='last-linear-layer: the BERT parameters are frozen and the task specific head parameters are updated; full-model: BERT parameters are updated as well',
-                        choices=('last-linear-layer', 'full-model'), default="last-linear-layer")
-    parser.add_argument("--use_gpu", action='store_true')
 
-    parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
-    parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
+    parser.add_argument("--unfreeze_gpt", type=int, default=7)
+    parser.add_argument("--unfreeze_all", type=int, default=8)
+
+    parser.add_argument("--use_gpu", action='store_true')
+    parser.add_argument("--local_data", action='store_true')
+
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
-                        default=1e-3)
+                        default=1e-4)
 
     args = parser.parse_args()
     return args
-
+def seed_everything(seed=11711):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 if __name__ == "__main__":
     args = get_args()
     seed_everything(args.seed)
 
-    print('Training Sentiment Classifier on SST...')
-    config = SimpleNamespace(
-        filepath='sst-classifier.pt',
-        lr=args.lr,
-        use_gpu=args.use_gpu,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        hidden_dropout_prob=args.hidden_dropout_prob,
-        train='data/ids-sst-train.csv',
-        dev='data/ids-sst-dev.csv',
-        test='data/ids-sst-test-student.csv',
-        fine_tune_mode=args.fine_tune_mode,
-        dev_out = 'predictions/' + args.fine_tune_mode + '-sst-dev-out.csv',
-        test_out = 'predictions/' + args.fine_tune_mode + '-sst-test-out.csv'
+    model_config = SimpleNamespace(
+        vocab_size=50_257,
+        embed_dim=768,
+        num_heads=12,
+        seq_len=1024,
+        depth=12,
+        attention_dropout=0.1,
+        residual_dropout=0.1,
+        mlp_ratio=4,
+        mlp_dropout=0.1,
+        emb_dropout=0.1,
     )
 
-    train(config)
-
-    print('Evaluating on SST...')
-    test(config)
-
-    print('Training Sentiment Classifier on cfimdb...')
-    config = SimpleNamespace(
-        filepath='cfimdb-classifier.pt',
-        lr=args.lr,
-        use_gpu=args.use_gpu,
+    train_config = SimpleNamespace(
         epochs=args.epochs,
-        batch_size=8,
-        hidden_dropout_prob=args.hidden_dropout_prob,
-        train='data/ids-cfimdb-train.csv',
-        dev='data/ids-cfimdb-dev.csv',
-        test='data/ids-cfimdb-test-student.csv',
-        fine_tune_mode=args.fine_tune_mode,
-        dev_out = 'predictions/' + args.fine_tune_mode + '-cfimdb-dev-out.csv',
-        test_out = 'predictions/' + args.fine_tune_mode + '-cfimdb-test-out.csv'
+        freeze_epochs_gpt=args.unfreeze_gpt,
+        freeze_epochs_all=args.unfreeze_all,
+        lr=args.lr,
+        device=get_device(),
+        model_path=Path('captioner'),
+        batch_size=args.batch_size
     )
 
-    train(config)
+    if args.local_data:
+        train_ds, val_ds = load_local_data(args)
+    else:
+        train_ds, val_ds = load_coco_data(args)
 
-    print('Evaluating on cfimdb...')
-    test(config)
+    train_dl = make_train_dataloader(train_ds, train_config)
+    val_dl = make_validation_dataloader(val_ds, train_config)
+
+    trainer = Trainer(model_config, train_config, (train_dl, val_dl))
+
+    trainer.fit()
+
+
+
