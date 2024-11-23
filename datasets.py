@@ -14,6 +14,7 @@ import torchvision.transforms as transforms
 
 tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
 tokenizer.pad_token = tokenizer.eos_token
+tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 class Dataset:
     def __init__(self, df, tfms):
         self.df = df
@@ -90,7 +91,7 @@ def load_local_data(args):
     return train_ds, val_ds
 
 def load_coco_data(args):
-    base_path = Path('/kaggle/input/coco-2017-dataset/coco2017')
+    base_path = Path('/root/kaggle-data/coco2017')
     annot = base_path / 'annotations' / 'captions_train2017.json'
     with open(annot, 'r') as f:
         data = json.load(f)
@@ -113,8 +114,8 @@ def load_coco_data(args):
     train_df, val_df = train_test_split(df, test_size=0.1)
     train_df.reset_index(drop=True, inplace=True)
     val_df.reset_index(drop=True, inplace=True)
-    print(len(train_df), len(val_df))
-
+    print(f'train size: {len(train_df)}')
+    print(f'valid size: {len(val_df)}')
     train_ds = Dataset(train_df, train_tfms)
     val_ds = Dataset(val_df, valid_tfms)
 

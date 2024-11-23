@@ -8,14 +8,15 @@ from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 from models.gpt2_transformer import GPT2Block
 
-tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
-
 
 class VisionGPT2Model(nn.Module):
     def __init__(self, config):
         super().__init__()
 
         self.config = config
+        self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
         # TODO: Why is pretrained set to False?
         vit = create_model(
@@ -80,7 +81,7 @@ class VisionGPT2Model(nn.Module):
                 layer.requires_grad = trainable
 
         total_frozen_params = sum([p.numel() for p in self.parameters() if not p.requires_grad])
-        print(f'{total_frozen_params=}')
+        print(f'total_frozen_params: {total_frozen_params}')
 
     def unfreeze_gpt_layers(self, ):
         gpt_layers = [[

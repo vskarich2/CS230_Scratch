@@ -56,6 +56,11 @@ if __name__ == "__main__":
     args = get_args()
     seed_everything(args.seed)
 
+    if args.local_data:
+        model_path = Path('/Users/vskarich/CS230_Scratch_Large/captioner')
+    else:
+        model_path = Path('/content/drive/MyDrive/cs230_f2024_final_project/models')
+
     model_config = SimpleNamespace(
         vocab_size=50_257,
         embed_dim=768,
@@ -75,7 +80,7 @@ if __name__ == "__main__":
         freeze_epochs_all=args.unfreeze_all,
         lr=args.lr,
         device=get_device(),
-        model_path=Path('/Users/vskarich/CS230_Scratch_Large/captioner'),
+        model_path=model_path,
         batch_size=args.batch_size
     )
 

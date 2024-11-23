@@ -1,18 +1,19 @@
 import warnings
+
+from progress_table import ProgressTable
+
 warnings.filterwarnings("ignore")
 
 from models.gpt2_vit_combined import VisionGPT2Model
-
+import numpy as np
 import gc
 from torchvision import transforms
 import pandas as pd
 import torch
 from PIL import Image
 from torch.cuda.amp import GradScaler, autocast
-from tqdm.auto import tqdm
+from tqdm import tqdm
 from transformers import GPT2TokenizerFast
-
-tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
 
 class Trainer:
     def __init__(self, model_config, train_config, dls):
@@ -20,14 +21,14 @@ class Trainer:
         self.train_config = train_config
         self.model_config = model_config
         self.device = self.train_config.device
+        self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
         self.model = VisionGPT2Model.from_pretrained(model_config).to(self.device)
         self.model.pretrained_layers_trainable(trainable=False)
 
         print(f'trainable parameters: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
-
-        self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
-        self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # TODO: What is GradScalar?
         self.scaler = GradScaler()
@@ -47,7 +48,7 @@ class Trainer:
         self.metrics = pd.DataFrame()
         self.metrics[['train_loss', 'train_perplexity', 'val_loss', 'val_perplexity']] = None
 
-        self.gen_tfms = transforms.Compose([
+        self.tfms = transforms.Compose([
             transforms.Resize(size=(224, 224)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
@@ -64,9 +65,10 @@ class Trainer:
         self.model.load_state_dict(sd)
 
     def train_one_epoch(self, epoch):
-        import numpy as np
+        # table = ProgressTable(["Epoch", "Step"])
+        # table.add_columns(["Loss"], aggregate="mean")
         # Notice how tdqm wraps data and objects
-        prog = tqdm(self.train_dl, total=len(self.train_dl))
+        prog = tqdm(self.train_dl, total=len(self.train_dl), leave=True)
 
         running_loss = 0.
 
@@ -87,7 +89,6 @@ class Trainer:
                 self.optim.zero_grad(set_to_none=True)
 
                 running_loss += loss.item()
-
                 prog.set_description(f'train loss: {loss.item():.3f}')
 
             # Why do we do this?
@@ -113,7 +114,6 @@ class Trainer:
 
                 loss = self.model(image, input_ids, labels)
                 running_loss += loss.item()
-
                 prog.set_description(f'valid loss: {loss.item():.3f}')
 
             del image, input_ids, labels, loss
@@ -133,9 +133,8 @@ class Trainer:
 
         best_pxp = 1e9
         best_epoch = -1
-        prog = tqdm(range(self.train_config.epochs))
 
-        for epoch in prog:
+        for epoch in range(self.train_config.epochs):
 
             if epoch == self.train_config.freeze_epochs_gpt:
                 self.model.unfreeze_gpt_layers()
@@ -147,13 +146,13 @@ class Trainer:
             # Put model in training mode, as opposed to eval mode
             self.model.train()
 
-            prog.set_description('training')
+
             self.train_one_epoch(epoch)
             self.clean()
 
             # Put model in eval mode, as opposed to training mode
             self.model.eval()
-            prog.set_description('validating')
+
             pxp = self.valid_one_epoch(epoch)
             self.clean()
 
@@ -177,8 +176,7 @@ class Trainer:
         self.model.eval()
 
         image = Image.open(image).convert('RGB')
-        image = np.array(image)
-        image = self.gen_tfms(image=image)['image']
+        image = self.tfms(image)
         image = image.unsqueeze(0).to(self.device)
         sequence = torch.ones(1, 1).to(device=self.device).long() * self.tokenizer.bos_token_id
 
