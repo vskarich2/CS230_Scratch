@@ -44,6 +44,8 @@ class Trainer:
         self.train_dl = make_train_dataloader(self.train_ds, self.train_config)
         self.val_dl = make_validation_dataloader(self.valid_ds, self.train_config)
 
+
+
         print(f'trainable parameters: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
 
         # TODO: What is GradScalar?

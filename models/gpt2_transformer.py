@@ -9,8 +9,9 @@ from models.gpt2_mlp import GPT2MLP
 
 class GPT2Block(nn.Module):
     # This is the main block for the model
-    def __init__(self, config):
+    def __init__(self, config, args):
         super().__init__()
+        self.args = args
         self.embed_dim = config.embed_dim
         self.ln_1 = nn.LayerNorm(self.embed_dim)
         self.attn = GPT2Attention(config)
@@ -20,9 +21,14 @@ class GPT2Block(nn.Module):
         self.cross_attn = GPT2CrossAttention(config)
 
     def forward(self, x, enc_out):
-        shortcut = x
-        x = x + self.attn(self.ln_1(x))
-        x = x + self.cross_attn(self.ln_2(x), enc_out, enc_out)
-        x = x + self.mlp(self.ln_3(x))
-        x = x + shortcut
+        if self.args.short_cut:
+            shortcut = x
+            x = x + self.attn(self.ln_1(x))
+            x = x + self.cross_attn(self.ln_2(x), enc_out, enc_out)
+            x = x + self.mlp(self.ln_3(x))
+            x = x + shortcut
+        else:
+            x = x + self.attn(self.ln_1(x))
+            x = x + self.cross_attn(self.ln_2(x), enc_out, enc_out)
+            x = x + self.mlp(self.ln_3(x))
         return x

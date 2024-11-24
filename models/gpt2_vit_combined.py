@@ -13,9 +13,9 @@ from models.gpt2_transformer import GPT2Block
 
 
 class VisionGPT2Model(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, args):
         super().__init__()
-
+        self.args = args
         self.config = config
         self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -41,7 +41,7 @@ class VisionGPT2Model(nn.Module):
             wte=nn.Embedding(config.vocab_size, config.embed_dim), # This is the token embedding
             wpe=nn.Embedding(config.seq_len, config.embed_dim), # This is the positional embedding
             drop=nn.Dropout(config.emb_dropout),
-            h=nn.ModuleList([GPT2Block(config) for _ in range(config.depth)]),
+            h=nn.ModuleList([GPT2Block(config, self.args) for _ in range(config.depth)]),
             ln_f=nn.LayerNorm(config.embed_dim)
         ))
 
@@ -106,7 +106,7 @@ class VisionGPT2Model(nn.Module):
     @classmethod
     def from_pretrained(self, config):
 
-        model = VisionGPT2Model(config)
+        model = VisionGPT2Model(config, self.args)
         sd = model.state_dict()
 
         ignore_matches = ['blocks.', 'cross_attn.', 'ln_3', 'cls_token', 'pos_embed', 'patch_embed.', '.attn.mask']
