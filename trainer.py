@@ -36,7 +36,7 @@ class Trainer:
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
-        self.model = VisionGPT2Model.from_pretrained(model_config).to(self.device)
+        self.model = VisionGPT2Model.from_pretrained(model_config, self.args).to(self.device)
         self.model.pretrained_layers_trainable(trainable=False)
 
         self.train_df, self.valid_df = self.load_dataframes(args)
@@ -202,7 +202,7 @@ class Trainer:
 
     @torch.no_grad()
     # TODO: Understand what are all these variables
-    def generate_caption(self, image, max_tokens=5, temperature=1.0, sampling_method='argmax'):
+    def generate_caption(self, image, max_tokens=50, temperature=1.0, sampling_method='argmax'):
         self.model.eval()
 
         image = Image.open(image).convert('RGB')

@@ -104,9 +104,9 @@ class VisionGPT2Model(nn.Module):
                 layer.requires_grad = True
 
     @classmethod
-    def from_pretrained(self, config):
+    def from_pretrained(self, config, args):
 
-        model = VisionGPT2Model(config, self.args)
+        model = VisionGPT2Model(config, args)
         sd = model.state_dict()
 
         ignore_matches = ['blocks.', 'cross_attn.', 'ln_3', 'cls_token', 'pos_embed', 'patch_embed.', '.attn.mask']
