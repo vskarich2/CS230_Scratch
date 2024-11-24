@@ -34,7 +34,8 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--sample", type=float, default=1.0)
+    parser.add_argument("--sample", action='store_true')
+    parser.add_argument("--sample_size", type=int, default=1000)
 
     parser.add_argument("--unfreeze_gpt", type=int, default=7)
     parser.add_argument("--unfreeze_all", type=int, default=8)

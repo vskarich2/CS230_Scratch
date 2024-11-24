@@ -74,6 +74,10 @@ class Trainer:
             train_df, valid_df = load_local_data(args)
         else:
             train_df, valid_df = load_coco_data(args)
+            if args.sample:
+                train_df = train_df.sample(args.sample_size)
+                valid_df = valid_df.sample(int(args.sample_size * 0.1))
+
 
         return train_df, valid_df
 
