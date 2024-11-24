@@ -1,4 +1,7 @@
 import warnings
+
+from constants import EOS_TOKEN_ID
+
 warnings.filterwarnings("ignore")
 import torch
 import torch.nn as nn
@@ -105,30 +108,29 @@ class VisionGPT2Model(nn.Module):
 
         model = VisionGPT2Model(config)
         sd = model.state_dict()
-        keys = sd.keys()
-        ignore_matches = ['blocks.', 'cross_attn.', 'ln_3', 'cls_token', 'pos_embed', 'patch_embed.', '.attn.mask']
-        vit_keys = [key for key in keys if any(match in key for match in ignore_matches)]
-        gpt_keys = [key for key in keys if key not in vit_keys]
 
-        # TODO: Try a larger GPT2 model here
+        ignore_matches = ['blocks.', 'cross_attn.', 'ln_3', 'cls_token', 'pos_embed', 'patch_embed.', '.attn.mask']
+
         gpt2_small = GPT2LMHeadModel.from_pretrained('gpt2')
-        sd_hf = gpt2_small.state_dict()
-        hf_keys = sd_hf.keys()
-        hf_keys = [k for k in hf_keys if not k.endswith('.attn.masked_bias')]
-        hf_keys = [k for k in hf_keys if not k.endswith('.attn.bias')]
+        gpt2_state_dict = gpt2_small.state_dict()
+
+        gpt2_sd_keys = gpt2_state_dict.keys()
+        gpt2_sd_keys = [k for k in gpt2_sd_keys if not k.endswith('.attn.masked_bias')]
+        gpt2_sd_keys = [k for k in gpt2_sd_keys if not k.endswith('.attn.bias')]
+
         transposed = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
 
-        for k in hf_keys:
+        for k in gpt2_sd_keys:
             if any(match in k for match in ignore_matches):
                 continue
             if any(k.endswith(w) for w in transposed):
-                assert sd_hf[k].shape[::-1] == sd[k].shape
+                assert gpt2_state_dict[k].shape[::-1] == sd[k].shape
                 with torch.no_grad():
-                    sd[k].copy_(sd_hf[k].t())
+                    sd[k].copy_(gpt2_state_dict[k].t())
             else:
-                assert sd_hf[k].shape == sd[k].shape
+                assert gpt2_state_dict[k].shape == sd[k].shape
                 with torch.no_grad():
-                    sd[k].copy_(sd_hf[k])
+                    sd[k].copy_(gpt2_state_dict[k])
 
         model.load_state_dict(sd)
 
@@ -144,11 +146,10 @@ class VisionGPT2Model(nn.Module):
         positional_embeddings = self.transformer.wpe(pos_embs)
         input_ids = self.transformer.drop(token_embeddings + positional_embeddings)
 
-        # This indicates that we make the forward pass simultaneously through both models
-        # I don't think this is correct. The image encoding should be done first, completely.
-
         for i in range(self.config.depth):
             image = self.vision_blocks[i](image) # TODO: Check the dimensions here.
+
+        for i in range(self.config.depth):
             input_ids = self.transformer.h[i](input_ids, image) # TODO: Check the dimensions here.
 
         input_ids = self.transformer.ln_f(input_ids)
@@ -161,17 +162,26 @@ class VisionGPT2Model(nn.Module):
         lm_logits = self.lm_head(input_ids[:, [-1], :])
         return lm_logits
 
-    def generate(self, image, sequence, max_tokens=50, temperature=1.0, deterministic=False, eos_token_id=50256):
+    def generate(self, image, tokens, max_tokens=50, temperature=1.0, sampling_method='argmax'):
         for _ in range(max_tokens):
-            out = self(image, sequence)
-            out = out[:, -1, :] / temperature
-            probs = F.softmax(out, dim=-1)
-            if deterministic:
+
+            logits = self(image, tokens)
+            scaled_logits = logits[:, -1, :] / temperature
+            probs = F.softmax(scaled_logits, dim=-1)
+
+            if sampling_method == 'argmax':
                 next_token = torch.argmax(probs, dim=-1, keepdim=True)
             else:
-                next_token = torch.multinomial(probs, num_samples=1)
-            sequence = torch.cat([sequence, next_token], dim=1)
-            if next_token.item() == eos_token_id:
+                try:
+                    next_token = torch.multinomial(probs, num_samples=1)
+                except Exception as e:
+                    print(e)
+                    next_token = torch.tensor([[EOS_TOKEN_ID]]).to(tokens.device)
+
+
+            tokens = torch.cat([tokens, next_token], dim=1)
+
+            if next_token.item() == EOS_TOKEN_ID:
                 break
 
-        return sequence.cpu().flatten()
+        return tokens.cpu().flatten()

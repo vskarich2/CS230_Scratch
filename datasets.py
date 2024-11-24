@@ -85,10 +85,7 @@ def load_local_data(args):
     train_df.reset_index(drop=True, inplace=True)
     val_df.reset_index(drop=True, inplace=True)
 
-    train_ds = Dataset(train_df, train_tfms)
-    val_ds = Dataset(val_df, valid_tfms)
-
-    return train_ds, val_ds
+    return train_df, val_df
 
 def load_coco_data(args):
     base_path = Path('/root/kaggle-data/coco2017')
@@ -108,7 +105,6 @@ def load_coco_data(args):
         lambda x: base_path / 'train2017' / x
     )
 
-    #df = df.sample(150_000) TODO: add sampling
     df = df.reset_index(drop=True)
 
     train_df, val_df = train_test_split(df, test_size=0.1)
@@ -116,9 +112,11 @@ def load_coco_data(args):
     val_df.reset_index(drop=True, inplace=True)
     print(f'train size: {len(train_df)}')
     print(f'valid size: {len(val_df)}')
+
+    return train_df, val_df
+def make_datasets(train_df, val_df):
     train_ds = Dataset(train_df, train_tfms)
     val_ds = Dataset(val_df, valid_tfms)
-
     return train_ds, val_ds
 
 def make_train_dataloader(ds, train_config):
