@@ -11,7 +11,6 @@ from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 from models.gpt2_transformer import GPT2Block
 
-
 class VisionGPT2Model(nn.Module):
     def __init__(self, config, args):
         super().__init__()
@@ -103,38 +102,8 @@ class VisionGPT2Model(nn.Module):
             else:
                 layer.requires_grad = True
 
-    @classmethod
-    def from_pretrained(self, config, args):
 
-        model = VisionGPT2Model(config, args)
-        sd = model.state_dict()
 
-        ignore_matches = ['blocks.', 'cross_attn.', 'ln_3', 'cls_token', 'pos_embed', 'patch_embed.', '.attn.mask']
-
-        gpt2_small = GPT2LMHeadModel.from_pretrained('gpt2')
-        gpt2_state_dict = gpt2_small.state_dict()
-
-        gpt2_sd_keys = gpt2_state_dict.keys()
-        gpt2_sd_keys = [k for k in gpt2_sd_keys if not k.endswith('.attn.masked_bias')]
-        gpt2_sd_keys = [k for k in gpt2_sd_keys if not k.endswith('.attn.bias')]
-
-        transposed = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
-
-        for k in gpt2_sd_keys:
-            if any(match in k for match in ignore_matches):
-                continue
-            if any(k.endswith(w) for w in transposed):
-                assert gpt2_state_dict[k].shape[::-1] == sd[k].shape
-                with torch.no_grad():
-                    sd[k].copy_(gpt2_state_dict[k].t())
-            else:
-                assert gpt2_state_dict[k].shape == sd[k].shape
-                with torch.no_grad():
-                    sd[k].copy_(gpt2_state_dict[k])
-
-        model.load_state_dict(sd)
-
-        return model
 
     def forward(self, image, input_ids, labels=None):
 
@@ -185,3 +154,35 @@ class VisionGPT2Model(nn.Module):
                 break
 
         return tokens.cpu().flatten()
+
+    def from_pretrained(config, args):
+
+        model = VisionGPT2Model(config, args)
+        sd = model.state_dict()
+
+        ignore_matches = ['blocks.', 'cross_attn.', 'ln_3', 'cls_token', 'pos_embed', 'patch_embed.', '.attn.mask']
+
+        gpt2_small = GPT2LMHeadModel.from_pretrained('gpt2')
+        gpt2_state_dict = gpt2_small.state_dict()
+
+        gpt2_sd_keys = gpt2_state_dict.keys()
+        gpt2_sd_keys = [k for k in gpt2_sd_keys if not k.endswith('.attn.masked_bias')]
+        gpt2_sd_keys = [k for k in gpt2_sd_keys if not k.endswith('.attn.bias')]
+
+        transposed = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
+
+        for k in gpt2_sd_keys:
+            if any(match in k for match in ignore_matches):
+                continue
+            if any(k.endswith(w) for w in transposed):
+                assert gpt2_state_dict[k].shape[::-1] == sd[k].shape
+                with torch.no_grad():
+                    sd[k].copy_(gpt2_state_dict[k].t())
+            else:
+                assert gpt2_state_dict[k].shape == sd[k].shape
+                with torch.no_grad():
+                    sd[k].copy_(gpt2_state_dict[k])
+
+        model.load_state_dict(sd)
+
+        return model

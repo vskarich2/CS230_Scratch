@@ -27,7 +27,48 @@ def get_device(args):
     return device
 
 
+def get_args_colab():
+    args = argparse.Namespace(
+        seed=11711,
+        epochs=10,
+        sample=True,
+        shortcut=False,
+        sample_size=1000,
+        unfreeze_gpt=7,
+        unfreeze_all=8,
+        infer_only=True,
+        batch_size=32,
+        sampling_method='multinomial',
+        temp=1.0,
+        lr=1e-4,
+        model_name="captioner.pt"
+    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=11711)
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--sample", action='store_true')
+    parser.add_argument("--shortcut", action='store_true')
+    parser.add_argument("--sample_size", type=int, default=1000)
 
+    parser.add_argument("--unfreeze_gpt", type=int, default=7)
+    parser.add_argument("--unfreeze_all", type=int, default=8)
+
+    parser.add_argument("--use_gpu", action='store_true')
+    parser.add_argument("--infer_only", action='store_true')
+    parser.add_argument("--local_mode", action='store_true')
+
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--image_location", type=str, default="")
+    parser.add_argument("--model_name", type=str, default="captioner.pt")
+    parser.add_argument("--sampling_method", type=str, default="multinomial")
+    parser.add_argument("--temp", type=float, default=1.0)
+    parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
+                        default=1e-4)
+
+
+    args = parser.parse_args()
+
+    return args
 
 
 def get_args():
@@ -54,7 +95,7 @@ def get_args():
                         default=1e-4)
 
 
-    args = parser.parse_args([])
+    args = parser.parse_args()
 
     return args
 def seed_everything(seed=11711):
@@ -124,7 +165,7 @@ def inference_test(trainer, args):
 
 
 if __name__ == "__main__":
-    args = get_args(False)
+    args = get_args()
     seed_everything(args.seed)
     trainer = setup(args)
 
