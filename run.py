@@ -30,7 +30,7 @@ def get_device(args):
 
 
 
-def get_args(colab):
+def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--epochs", type=int, default=10)
@@ -53,10 +53,9 @@ def get_args(colab):
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-4)
 
-    if colab:
-        args = parser.parse_args([])
-    else:
-        args = parser.parse_args()
+
+    args = parser.parse_args([])
+
     return args
 def seed_everything(seed=11711):
     random.seed(seed)
