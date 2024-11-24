@@ -30,7 +30,7 @@ def get_device(args):
 
 
 
-def get_args(colab=False):
+def get_args(colab):
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--epochs", type=int, default=10)
@@ -125,7 +125,7 @@ def inference_test(trainer, args):
 
 
 if __name__ == "__main__":
-    args = get_args()
+    args = get_args(False)
     seed_everything(args.seed)
     trainer = setup(args)
 
