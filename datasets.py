@@ -88,7 +88,7 @@ def load_local_data(args):
     return train_df, val_df
 
 def load_coco_data(args):
-    base_path = Path('/root/kaggle-data/coco2017')
+    base_path = Path('/content/kaggle-data/coco2017')
     annot = base_path / 'annotations' / 'captions_train2017.json'
     with open(annot, 'r') as f:
         data = json.load(f)
