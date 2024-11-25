@@ -1,7 +1,7 @@
 import warnings
 from datetime import datetime
 
-from constants import LOCAL_MODEL_LOCATION
+from progress_table import ProgressTable
 from datasets import load_local_data, load_coco_data, make_train_dataloader, make_validation_dataloader, make_datasets
 
 warnings.filterwarnings("ignore")
@@ -17,7 +17,12 @@ from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
+table = ProgressTable(["Epoch", "Step"],  pbar_style="angled alt red blue")
+table.add_column("Train Loss", aggregate="mean")
+table.add_column("Valid Loss", aggregate="mean")
+table.add_column("Perp", aggregate="mean")
 
+from constants import LOCAL_MODEL_LOCATION
 
 class Trainer:
     def __init__(self, model_config, train_config, args):
@@ -83,9 +88,10 @@ class Trainer:
 
     def save_model(self, ):
         # TODO: Check if we should store optimizer data
-        self.train_config.model_path.mkdir(exist_ok=True)
-        sd = self.model.state_dict()
-        torch.save(sd, self.train_config.model_path / self.model_name)
+        if not self.args.local_mode:
+            self.train_config.model_path.mkdir(exist_ok=True)
+            sd = self.model.state_dict()
+            torch.save(sd, self.train_config.model_path / self.model_name)
 
     def load_best_model(self):
         # TODO: Check if we should store optimizer data
@@ -99,13 +105,14 @@ class Trainer:
         )
         self.model.load_state_dict(sd)
     def train_one_epoch(self, epoch):
-        prog = tqdm(self.train_dl, total=len(self.train_dl), leave=True)
 
         running_loss = 0.
-
-        for image, input_ids, labels in prog:
+        step = 1
+        for image, input_ids, labels in table(self.train_dl):
             # TODO: What is autocast?
             with autocast():
+                table["Step"] = step
+                step = step + 1
                 image = image.to(self.device)
                 input_ids = input_ids.to(self.device)
                 labels = labels.to(self.device)
@@ -120,7 +127,7 @@ class Trainer:
                 self.optim.zero_grad(set_to_none=True)
 
                 running_loss += loss.item()
-                prog.set_description(f'train loss: {loss.item():.3f}')
+                table["Train Loss"] = loss.item()
 
             # Why do we do this?
             del image, input_ids, labels, loss
@@ -133,11 +140,10 @@ class Trainer:
     @torch.no_grad()
     def valid_one_epoch(self, epoch):
         import numpy as np
-        prog = tqdm(self.val_dl, total=len(self.val_dl))
 
         running_loss = 0.
 
-        for image, input_ids, labels in prog:
+        for image, input_ids, labels in table(self.val_dl):
             with autocast():
                 image = image.to(self.device)
                 input_ids = input_ids.to(self.device)
@@ -145,7 +151,7 @@ class Trainer:
 
                 loss = self.model(image, input_ids, labels)
                 running_loss += loss.item()
-                prog.set_description(f'valid loss: {loss.item():.3f}')
+                table["Valid Loss"] = loss.item()
 
             del image, input_ids, labels, loss
 
@@ -164,12 +170,11 @@ class Trainer:
 
         best_pxp = 1e9
         best_epoch = -1
-
         for epoch in range(self.train_config.epochs):
+            table["Epoch"] = f"{epoch}/{self.train_config.epochs}"
 
             if epoch == self.train_config.freeze_epochs_gpt:
                 self.model.unfreeze_gpt_layers()
-                print('unfreezing GPT2 entirely...')
 
             if epoch == self.train_config.freeze_epochs_all:
                 self.model.pretrained_layers_trainable(trainable=True)
@@ -187,13 +192,14 @@ class Trainer:
             pxp = self.valid_one_epoch(epoch)
             self.clean()
 
-            print(self.metrics.tail(1))
-
             if pxp < best_pxp:
                 best_pxp = pxp
                 best_epoch = epoch
-                print('saving best model...')
                 self.save_model()
+            table["Perp"] = pxp
+            table.next_row()
+
+        table.close()
 
         return {
             'best_perplexity': best_pxp,

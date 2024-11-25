@@ -82,8 +82,6 @@ class VisionGPT2Model(nn.Module):
             else:
                 layer.requires_grad = trainable
 
-        total_frozen_params = sum([p.numel() for p in self.parameters() if not p.requires_grad])
-        print(f'total_frozen_params: {total_frozen_params}')
 
     def unfreeze_gpt_layers(self, ):
         gpt_layers = [[
