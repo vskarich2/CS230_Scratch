@@ -88,7 +88,7 @@ def setup(args):
         freeze_epochs_all=args.unfreeze_all,
         lr=args.lr,
         device=get_device(args),
-        model_path=model_path,
+        model_path=Path(model_path),
         batch_size=args.batch_size
     )
 
