@@ -2,7 +2,7 @@ import warnings
 
 from matplotlib import pyplot as plt
 
-from constants import LOCAL_MODEL_LOCATION
+from constants import LOCAL_MODEL_LOCATION, REMOTE_MODEL_LOCATION
 
 warnings.filterwarnings("ignore")
 
@@ -67,7 +67,7 @@ def setup(args):
     if args.local_mode:
         model_path = LOCAL_MODEL_LOCATION
     else:
-        model_path = Path('/home/veljko_skarich/models')
+        model_path = REMOTE_MODEL_LOCATION
 
     model_config = SimpleNamespace(
         vocab_size=50_257,
