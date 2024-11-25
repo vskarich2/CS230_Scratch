@@ -89,7 +89,7 @@ class Trainer:
 
     def load_best_model(self):
         # TODO: Check if we should store optimizer data
-        sd = torch.load(self.train_config.model_path / self.args.model_name)
+        sd = torch.load(self.train_config.model_path / self.model_name)
         self.model.load_state_dict(sd)
 
     def load_local_model(self):
