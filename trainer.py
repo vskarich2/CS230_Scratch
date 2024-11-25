@@ -17,10 +17,10 @@ from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
-table = ProgressTable(["Epoch", "Step"],
+table = ProgressTable(["Epoch"],
                       pbar_style="angled alt red blue",
                       pbar_embedded=False,
-                      pbar_show_throughput=True,
+                      pbar_show_throughput=False,
                       pbar_show_progress=True,
                       pbar_show_percents=True,
                       pbar_show_eta=True
@@ -114,12 +114,9 @@ class Trainer:
     def train_one_epoch(self, epoch):
 
         running_loss = 0.
-        step = 1
         for image, input_ids, labels in table(self.train_dl):
             # TODO: What is autocast?
             with autocast():
-                table["Step"] = step
-                step = step + 1
                 image = image.to(self.device)
                 input_ids = input_ids.to(self.device)
                 labels = labels.to(self.device)
