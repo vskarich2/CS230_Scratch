@@ -1,4 +1,7 @@
 import warnings
+
+from constants import REMOTE_COCO_DATA_LOCATION
+
 warnings.filterwarnings("ignore")
 import json
 from pathlib import Path
@@ -88,7 +91,7 @@ def load_local_data(args):
     return train_df, val_df
 
 def load_coco_data(args):
-    base_path = Path('/home/veljko_skarich/kaggle-data/coco2017')
+    base_path = Path(REMOTE_COCO_DATA_LOCATION)
     annot = base_path / 'annotations' / 'captions_train2017.json'
     with open(annot, 'r') as f:
         data = json.load(f)
