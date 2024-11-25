@@ -18,9 +18,9 @@ from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
 table = ProgressTable(["Epoch", "Step"],  pbar_style="angled alt red blue", pbar_embedded=False)
-table.add_column("Train Loss", aggregate="mean")
-table.add_column("Valid Loss", aggregate="mean")
-table.add_column("Perp", aggregate="mean")
+table.add_column("Train Loss", aggregate="mean", color="bold blue")
+table.add_column("Valid Loss", aggregate="mean", color="bold red")
+table.add_column("Perplexity", aggregate="mean")
 
 from constants import LOCAL_MODEL_LOCATION
 
@@ -196,7 +196,7 @@ class Trainer:
                 best_pxp = pxp
                 best_epoch = epoch
                 self.save_model()
-            table["Perp"] = pxp
+            table["Perplexity"] = pxp
             table.next_row()
 
         table.close()
