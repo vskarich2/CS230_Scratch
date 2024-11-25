@@ -17,8 +17,15 @@ from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
-table = ProgressTable(["Epoch", "Step"],  pbar_style="angled alt red blue", pbar_embedded=False)
-table.add_column("Train Loss", aggregate="mean", color="bold blue")
+table = ProgressTable(["Epoch", "Step"],
+                      pbar_style="angled alt red blue",
+                      pbar_embedded=False,
+                      pbar_show_throughput=True,
+                      pbar_show_progress=True,
+                      pbar_show_percents=True,
+                      pbar_show_eta=True
+                      )
+table.add_column("Train Loss", aggregate="mean", color="bold red")
 table.add_column("Valid Loss", aggregate="mean", color="bold red")
 table.add_column("Perplexity", aggregate="mean")
 
