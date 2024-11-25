@@ -27,50 +27,6 @@ def get_device(args):
     return device
 
 
-def get_args_colab():
-    args = argparse.Namespace(
-        seed=11711,
-        epochs=10,
-        sample=True,
-        shortcut=False,
-        sample_size=1000,
-        unfreeze_gpt=7,
-        unfreeze_all=8,
-        infer_only=True,
-        batch_size=32,
-        sampling_method='multinomial',
-        temp=1.0,
-        lr=1e-4,
-        model_name="captioner.pt"
-    )
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--sample", action='store_true')
-    parser.add_argument("--shortcut", action='store_true')
-    parser.add_argument("--sample_size", type=int, default=1000)
-
-    parser.add_argument("--unfreeze_gpt", type=int, default=7)
-    parser.add_argument("--unfreeze_all", type=int, default=8)
-
-    parser.add_argument("--use_gpu", action='store_true')
-    parser.add_argument("--infer_only", action='store_true')
-    parser.add_argument("--local_mode", action='store_true')
-
-    parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--image_location", type=str, default="")
-    parser.add_argument("--model_name", type=str, default="captioner.pt")
-    parser.add_argument("--sampling_method", type=str, default="multinomial")
-    parser.add_argument("--temp", type=float, default=1.0)
-    parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
-                        default=1e-4)
-
-
-    args = parser.parse_args()
-
-    return args
-
-
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
@@ -85,15 +41,15 @@ def get_args():
     parser.add_argument("--use_gpu", action='store_true')
     parser.add_argument("--infer_only", action='store_true')
     parser.add_argument("--local_mode", action='store_true')
+    parser.add_argument("--is_linux", action='store_true')
 
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--image_location", type=str, default="")
     parser.add_argument("--model_name", type=str, default="captioner.pt")
-    parser.add_argument("--sampling_method", type=str, default="argmax")
+    parser.add_argument("--sampling_method", type=str, default="multinomial")
     parser.add_argument("--temp", type=float, default=1.0)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-4)
-
 
     args = parser.parse_args()
 
@@ -111,7 +67,7 @@ def setup(args):
     if args.local_mode:
         model_path = LOCAL_MODEL_LOCATION
     else:
-        model_path = Path('/content/drive/MyDrive/cs230_f2024_final_project/models')
+        model_path = Path('/home/veljko_skarich/models')
 
     model_config = SimpleNamespace(
         vocab_size=50_257,
@@ -153,6 +109,18 @@ def show_image(test_img, test_caption, sampling_method, temp):
     plt.title(f"actual: {test_caption}\nmodel: {gen_caption}\ntemp: {temp} sampling_method: {sampling_method}")
     plt.axis('off')
     plt.show()
+
+def compare_captions(test_img, test_caption, sampling_method, temp):
+
+    gen_caption = trainer.generate_caption(
+        test_img,
+        temperature=temp,
+        sampling_method=sampling_method
+    )
+
+    print(f"actual: {test_caption}\nmodel: {gen_caption}\ntemp: {temp} sampling_method: {sampling_method}")
+    print("\n\n\n")
+
 def inference_test(trainer, args):
 
     if args.image_location != "":
@@ -161,7 +129,10 @@ def inference_test(trainer, args):
         for i in range(50):
             test = trainer.valid_df.sample(n=1).values[0]
             test_img, test_caption = test[0], test[1]
-            show_image(test_img, test_caption, args.sampling_method, args.temp)
+            if args.is_linux:
+                compare_captions(test_img, test_caption, args.sampling_method, args)
+            else:
+                show_image(test_img, test_caption, args.sampling_method, args.temp)
 
 
 if __name__ == "__main__":
