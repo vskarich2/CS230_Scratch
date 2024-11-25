@@ -202,7 +202,7 @@ class Trainer:
 
     @torch.no_grad()
     # TODO: Understand what are all these variables
-    def generate_caption(self, image, max_tokens=50, temperature=1.0, sampling_method='argmax'):
+    def generate_caption(self, image, max_tokens=50, temperature=1.0, sampling_method='multinomial'):
         self.model.eval()
 
         image = Image.open(image).convert('RGB')

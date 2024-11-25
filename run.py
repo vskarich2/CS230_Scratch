@@ -130,7 +130,7 @@ def inference_test(trainer, args):
             test = trainer.valid_df.sample(n=1).values[0]
             test_img, test_caption = test[0], test[1]
             if args.is_linux:
-                compare_captions(test_img, test_caption, args.sampling_method, args)
+                compare_captions(test_img, test_caption, args.sampling_method, args.temp)
             else:
                 show_image(test_img, test_caption, args.sampling_method, args.temp)
 
