@@ -159,7 +159,7 @@ if __name__ == "__main__":
         result = trainer.fit()
         trainer.load_best_model()
 
-        with open(f'{trainer.model_name}.txt', "w") as file:
+        with open(trainer.train_config.model_path / f'{trainer.model_name}.txt', "w") as file:
             file.write(result['table'].to_df().to_string())
             inference_test(trainer, file, args)
             file.close()
