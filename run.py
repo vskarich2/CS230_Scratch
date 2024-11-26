@@ -118,7 +118,7 @@ def compare_captions(test_img, test_caption, sampling_method, temp):
         sampling_method=sampling_method
     )
 
-    print(f"actual: {test_caption}\nmodel: {gen_caption}\n")
+    print(f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n")
 
 
 def inference_test(trainer, args):
