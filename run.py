@@ -164,7 +164,7 @@ if __name__ == "__main__":
 
         with open(f'{trainer.model_name}.txt', "w") as file:
             file.write(result['table'].to_df().to_string())
-            inference_test(trainer, args)
+            inference_test(trainer, file, args)
             file.close()
 
 
