@@ -34,13 +34,15 @@ from constants import LOCAL_MODEL_LOCATION
 class Trainer:
     def __init__(self, model_config, train_config, args):
         self.args = args
-        self.model_name = (datetime.now().strftime("%A, %d. %B %Y %I:%M%p")
+        self.model_timestamp = (datetime.now().strftime("%m-%d-%H:%M")
                            .replace(',', '')
                            .replace(':', '')
                            .replace(' ', '-')
                            .replace('.', ''))
 
-        self.model_name = self.model_name + '-captioner.pt'
+        self.model_details = f'e-{args.epochs}_t{args.temp}_lr{args.lr}_{args.model_name}'
+        self.model_name = f'{self.model_timestamp}_{self.model_details}'
+        
         self.train_config = train_config
         self.model_config = model_config
         self.device = self.train_config.device
@@ -92,8 +94,9 @@ class Trainer:
 
 
         return train_df, valid_df
-
-    def save_model(self, ):
+    def create_model_info_str(self, args):
+        name = f'e-{args.epochs}_t{args.temp}_lr{args.lr}_{args.model_name}'
+    def save_model(self):
         # TODO: Check if we should store optimizer data
         if not self.args.local_mode:
             self.train_config.model_path.mkdir(exist_ok=True)
