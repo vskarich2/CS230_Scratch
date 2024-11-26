@@ -160,8 +160,9 @@ if __name__ == "__main__":
         trainer.load_best_model()
 
         with open(trainer.train_config.model_path / f'{trainer.model_name}.txt', "w") as file:
-            file.write(result['table'].to_df().to_string())
+            file.write(result['table'].to_df().dropna().to_string())
             inference_test(trainer, file, args)
+            result['table'].close()
             file.close()
 
 
