@@ -36,11 +36,10 @@ class Trainer:
         self.args = args
         self.model_timestamp = (datetime.now().strftime("%m-%d-%H:%M")
                            .replace(',', '')
-                           .replace(':', '')
                            .replace(' ', '-')
                            .replace('.', ''))
 
-        self.model_details = f'e-{args.epochs}_t{args.temp}_lr{args.lr}_{args.model_name}'
+        self.model_details = f'e{args.epochs}_t{args.temp}_lr{args.lr}_{args.model_name}'
         self.model_name = f'{self.model_timestamp}_{self.model_details}'
         
         self.train_config = train_config
