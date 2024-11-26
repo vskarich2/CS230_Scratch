@@ -33,6 +33,7 @@ from constants import LOCAL_MODEL_LOCATION
 
 class Trainer:
     def __init__(self, model_config, train_config, args):
+        self.table = table
         self.args = args
         self.model_timestamp = (datetime.now().strftime("%m-%d-%H-%M")
                            .replace(',', '')
@@ -104,6 +105,7 @@ class Trainer:
 
     def load_best_model(self):
         # TODO: Check if we should store optimizer data
+        print(f'Loading best model...{self.model_name}')
         sd = torch.load(self.train_config.model_path / self.model_name)
         self.model.load_state_dict(sd)
 
@@ -116,7 +118,7 @@ class Trainer:
     def train_one_epoch(self, epoch):
 
         running_loss = 0.
-        for image, input_ids, labels in table(self.train_dl):
+        for image, input_ids, labels in self.table(self.train_dl):
             # TODO: What is autocast?
             with autocast():
                 image = image.to(self.device)
@@ -133,7 +135,7 @@ class Trainer:
                 self.optim.zero_grad(set_to_none=True)
 
                 running_loss += loss.item()
-                table["Train Loss"] = loss.item()
+                self.table["Train Loss"] = loss.item()
 
             # Why do we do this?
             del image, input_ids, labels, loss
@@ -157,7 +159,7 @@ class Trainer:
 
                 loss = self.model(image, input_ids, labels)
                 running_loss += loss.item()
-                table["Valid Loss"] = loss.item()
+                self.table["Valid Loss"] = loss.item()
 
             del image, input_ids, labels, loss
 
@@ -177,7 +179,7 @@ class Trainer:
         best_pxp = 1e9
         best_epoch = -1
         for epoch in range(self.train_config.epochs):
-            table["Epoch"] = f"{epoch}/{self.train_config.epochs}"
+            self.table["Epoch"] = f"{epoch}/{self.train_config.epochs}"
 
             if epoch == self.train_config.freeze_epochs_gpt:
                 self.model.unfreeze_gpt_layers()
@@ -202,14 +204,16 @@ class Trainer:
                 best_pxp = pxp
                 best_epoch = epoch
                 self.save_model()
-            table["Perplexity"] = pxp
-            table.next_row()
+            self.table["Perplexity"] = pxp
+            self.table.next_row()
 
-        table.close()
+
+
 
         return {
             'best_perplexity': best_pxp,
-            'best_epoch': best_epoch
+            'best_epoch': best_epoch,
+            'table': self.table
         }
 
     @torch.no_grad()

@@ -110,7 +110,7 @@ def show_image(test_img, test_caption, sampling_method, temp):
     plt.axis('off')
     plt.show()
 
-def compare_captions(test_img, test_caption, sampling_method, temp):
+def compare_captions(test_img, test_caption, sampling_method, temp, trainer):
 
     gen_caption = trainer.generate_caption(
         test_img,
@@ -118,7 +118,12 @@ def compare_captions(test_img, test_caption, sampling_method, temp):
         sampling_method=sampling_method
     )
 
-    print(f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n")
+    result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
+
+    with open(f'{trainer.model_name}.txt', "w") as file:
+        file.write(result)
+
+    print(result)
 
 
 def inference_test(trainer, args):
@@ -130,7 +135,14 @@ def inference_test(trainer, args):
             test = trainer.valid_df.sample(n=1).values[0]
             test_img, test_caption = test[0], test[1]
             if args.is_linux:
-                compare_captions(test_img, test_caption, args.sampling_method, args.temp)
+
+                compare_captions(
+                    test_img,
+                    test_caption,
+                    args.sampling_method,
+                    args.temp,
+                    trainer
+                )
             else:
                 show_image(test_img, test_caption, args.sampling_method, args.temp)
 
@@ -147,8 +159,12 @@ if __name__ == "__main__":
             trainer.load_best_model()
         inference_test(trainer, args)
     else:
-        trainer.fit()
+        result = trainer.fit()
         trainer.load_best_model()
+
+        with open(f'{trainer.model_name}.txt', "w") as file:
+            file.write(result.table)
+
         inference_test(trainer, args)
 
 
