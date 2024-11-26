@@ -34,7 +34,7 @@ from constants import LOCAL_MODEL_LOCATION
 class Trainer:
     def __init__(self, model_config, train_config, args):
         self.args = args
-        self.model_timestamp = (datetime.now().strftime("%m-%d-%H:%M")
+        self.model_timestamp = (datetime.now().strftime("%m-%d-%H-%M")
                            .replace(',', '')
                            .replace(' ', '-')
                            .replace('.', ''))
