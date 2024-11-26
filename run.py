@@ -119,10 +119,7 @@ def compare_captions(test_img, test_caption, sampling_method, temp, file):
     )
 
     result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
-
-    with open(file, "w") as f:
-        f.write(result)
-
+    file.write(result)
     print(result)
 
 
