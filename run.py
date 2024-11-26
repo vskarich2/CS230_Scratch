@@ -110,7 +110,7 @@ def show_image(test_img, test_caption, sampling_method, temp):
     plt.axis('off')
     plt.show()
 
-def compare_captions(test_img, test_caption, sampling_method, temp, trainer):
+def compare_captions(test_img, test_caption, sampling_method, temp, file):
 
     gen_caption = trainer.generate_caption(
         test_img,
@@ -120,13 +120,13 @@ def compare_captions(test_img, test_caption, sampling_method, temp, trainer):
 
     result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
 
-    with open(f'{trainer.model_name}.txt', "w") as file:
-        file.write(result)
+    with open(file, "w") as f:
+        f.write(result)
 
     print(result)
 
 
-def inference_test(trainer, args):
+def inference_test(trainer, file, args):
 
     if args.image_location != "":
         show_image(args.image_location, "Not provided", args.sampling_method, args.temp)
@@ -141,7 +141,7 @@ def inference_test(trainer, args):
                     test_caption,
                     args.sampling_method,
                     args.temp,
-                    trainer
+                    file
                 )
             else:
                 show_image(test_img, test_caption, args.sampling_method, args.temp)
@@ -164,7 +164,8 @@ if __name__ == "__main__":
 
         with open(f'{trainer.model_name}.txt', "w") as file:
             file.write(result['table'].to_df().to_string())
+            inference_test(trainer, args)
+            file.close()
 
-        inference_test(trainer, args)
 
 
