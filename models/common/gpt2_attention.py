@@ -7,10 +7,18 @@ import torch.nn.functional as F
 
 class GPT2Attention(nn.Module):
     def __init__(self, config):
+
+        # Image tokens can only attend to previous image tokens (not text tokens).
+        # Text tokens can attend to both image tokens and previous text tokens.
+        # The separator token attends to the image tokens but not future text tokens.
+
         super().__init__()
         self.embed_dim = config.embed_dim
         self.n_heads = config.num_heads
+
         assert self.embed_dim % self.n_heads == 0, 'embedding dimension by be divisible by number of heads'
+
+
         self.head_size = self.embed_dim // self.n_heads
         self.seq_len = config.seq_len
 

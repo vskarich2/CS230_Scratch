@@ -2,9 +2,9 @@ import warnings
 warnings.filterwarnings("ignore")
 import torch.nn as nn
 
-from models.gpt2_attention import GPT2Attention
-from models.gpt2_cross_attention import GPT2CrossAttention
-from models.gpt2_mlp import GPT2MLP
+from models.common.gpt2_attention import GPT2Attention
+from models.cross_attention_model.gpt2_vit_cross_attention import GPT2CrossAttention
+from models.common.gpt2_mlp import GPT2MLP
 
 
 class GPT2Block(nn.Module):

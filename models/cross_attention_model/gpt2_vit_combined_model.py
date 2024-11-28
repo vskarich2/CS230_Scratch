@@ -1,6 +1,7 @@
 import warnings
 
 from constants import EOS_TOKEN_ID
+from models.image_encoder import ImageEncoder
 
 warnings.filterwarnings("ignore")
 import torch
@@ -9,7 +10,8 @@ import torch.nn.functional as F
 from timm import create_model
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
-from models.gpt2_transformer import GPT2Block
+
+from models.cross_attention_model.gpt2_vit_transformer import GPT2Block
 
 class VisionGPT2Model(nn.Module):
     def __init__(self, config, args):
@@ -47,7 +49,8 @@ class VisionGPT2Model(nn.Module):
         self.lm_head = nn.Linear(config.embed_dim, config.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight
 
-    def _pos_embed(self, x):
+    #TODO: Why is this method needed?
+    def vit_pos_embed(self, x):
         pos_embed = self.pos_embed
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
         x = x + pos_embed
@@ -101,58 +104,93 @@ class VisionGPT2Model(nn.Module):
                 layer.requires_grad = True
 
 
+    def forward(self, image, token_ids, labels=None):
 
+        # The patch embedding flattens the 2D patches of the image into 1D vectors
 
-    def forward(self, image, input_ids, labels=None):
+        # Batch Size x 3 RGB x 224 x 224
+        image_embeddings = self.patch_embed(image) # The patch embedding flattens the 2D patches of the image into 1D vectors
 
-        image = self.patch_embed(image)
-        image = self._pos_embed(image)
+        # Batch Size x 197 x 768 (each 16 by 16 patch is flattened to vector of 196 + 1
+        image_embeddings = self.vit_pos_embed(image_embeddings)
 
-        token_embeddings = self.transformer.wte(input_ids)  # batch x seq_len
-        pos_embs = torch.arange(0, input_ids.size(1)).to(input_ids.device)
-        positional_embeddings = self.transformer.wpe(pos_embs)
-        input_ids = self.transformer.drop(token_embeddings + positional_embeddings)
+        # Batch Size x max sequence length in batch
+        token_embeddings = self.transformer.wte(token_ids)  # batch x seq_len
+
+        # 1D Tensor of max sequence length in batch
+        positions = torch.arange(0, token_embeddings.size(1)).to(token_embeddings.device)
+
+        # Max sequence length x 768
+        positional_embeddings = self.transformer.wpe(positions)
+
+        # Batch Size x max sequence length in batch x 768
+        text_input_embeddings = self.transformer.drop(token_embeddings + positional_embeddings)
+
+        # Batch Size x 197 x 768
+        vit_hidden_state = image_embeddings
 
         for i in range(self.config.depth):
-            image = self.vision_blocks[i](image) # TODO: Check the dimensions here.
+            vit_hidden_state = self.vision_blocks[i](vit_hidden_state)
 
+        # Batch Size x max sequence length in batch x 768
+        gpt_hidden_state = text_input_embeddings
         for i in range(self.config.depth):
-            input_ids = self.transformer.h[i](input_ids, image) # TODO: Check the dimensions here.
 
-        input_ids = self.transformer.ln_f(input_ids)
+            # Note that gpt and vit both have hidden state embedding dimension of 768
+            gpt_hidden_state = self.transformer.h[i](gpt_hidden_state, vit_hidden_state)
+
+        # Batch Size x max sequence length in batch x 768
+        gpt_hidden_state = self.transformer.ln_f(gpt_hidden_state)
 
         if labels is not None:
-            lm_logits = self.lm_head(input_ids)
+            # Batch Size x max sequence length in batch x Vocab Size (50257)
+            lm_logits = self.lm_head(gpt_hidden_state)
             loss = F.cross_entropy(lm_logits.view(-1, lm_logits.shape[-1]), labels.view(-1))
+            # 1D tensor with single value
             return loss
 
-        lm_logits = self.lm_head(input_ids[:, [-1], :])
+        # Batch Size x Sequence of generated tokens x 768
+        # Batch Size is 32 for validation set run and 1 for single image caption generation
+        # Note that this gpt_hidden_state[:, [-1], :] preserves the sequence dimension
+        last_embedding_in_sequence_of_hidden_states = gpt_hidden_state[:, [-1], :]
+
+        # Batch Size x 1 x Vocab Size
+        lm_logits = self.lm_head(last_embedding_in_sequence_of_hidden_states)
+
         return lm_logits
 
-    def generate(self, image, tokens, max_tokens=50, temperature=1.0, sampling_method='argmax'):
+    def generate(self, image, token_ids_generated_so_far, max_tokens=50, temperature=1.0, sampling_method='argmax'):
         for _ in range(max_tokens):
+            # Initially during generation, the tokens tensor only contains token 50256, the start token
 
-            logits = self(image, tokens)
+            # Batch Size x 1 x Vocab Size
+            logits = self.forward(image, token_ids_generated_so_far)
+
+            # Note that this slice operation will remove the sequence length dimension.
             scaled_logits = logits[:, -1, :] / temperature
+
+            # Note that only selecting the last element of the sequence dimension eliminates that dimension
+            # So we go from a shape of [batch, sequence, vocab] to [batch, vocab].
+            # This 2D tensor is what softmax is expecting.
             probs = F.softmax(scaled_logits, dim=-1)
 
             if sampling_method == 'argmax':
-                next_token = torch.argmax(probs, dim=-1, keepdim=True)
+                next_token_id = torch.argmax(probs, dim=-1, keepdim=True)
             else:
                 try:
-                    next_token = torch.multinomial(probs, num_samples=1)
+                    next_token_id = torch.multinomial(probs, num_samples=1)
                 except Exception as e:
                     print(e)
-                    next_token = torch.tensor([[EOS_TOKEN_ID]]).to(tokens.device)
+                    next_token_id = torch.tensor([[EOS_TOKEN_ID]]).to(token_ids_generated_so_far.device)
 
+            # Append newly generated token to current token sequence
+            token_ids_generated_so_far = torch.cat([token_ids_generated_so_far, next_token_id], dim=1)
 
-            tokens = torch.cat([tokens, next_token], dim=1)
-
-            if next_token.item() == EOS_TOKEN_ID:
+            if next_token_id.item() == EOS_TOKEN_ID:
                 break
 
-        return tokens.cpu().flatten()
-
+        return token_ids_generated_so_far.cpu().flatten()
+    @staticmethod
     def from_pretrained(config, args):
 
         model = VisionGPT2Model(config, args)

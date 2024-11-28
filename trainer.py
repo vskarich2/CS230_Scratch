@@ -3,10 +3,11 @@ from datetime import datetime
 
 from progress_table import ProgressTable
 from datasets import load_local_data, load_coco_data, make_train_dataloader, make_validation_dataloader, make_datasets
+from models.unified_attention_model.gpt2_model import GPT
 
 warnings.filterwarnings("ignore")
 
-from models.gpt2_vit_combined import VisionGPT2Model
+from models.cross_attention_model.gpt2_vit_combined_model import VisionGPT2Model
 import numpy as np
 import gc
 from torchvision import transforms
@@ -14,7 +15,6 @@ import pandas as pd
 import torch
 from PIL import Image
 from torch.cuda.amp import GradScaler, autocast
-from tqdm import tqdm
 from transformers import GPT2TokenizerFast
 
 table = ProgressTable(["Epoch"],
@@ -35,30 +35,30 @@ class Trainer:
     def __init__(self, model_config, train_config, args):
         self.table = table
         self.args = args
-        self.model_timestamp = (datetime.now().strftime("%m-%d-%H-%M")
-                           .replace(',', '')
-                           .replace(' ', '-')
-                           .replace('.', ''))
 
-        self.model_details = f'e{args.epochs}_t{args.temp}_lr{args.lr}_{args.model_name}'
-        self.model_name = f'{self.model_timestamp}_{self.model_details}'
-        
+        if self.args.local_mode:
+            self.table.close()
+
+        self.model_name = args.model_name
         self.train_config = train_config
         self.model_config = model_config
+
         self.device = self.train_config.device
         self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
-        self.model = VisionGPT2Model.from_pretrained(model_config, self.args).to(self.device)
+        if self.args.mode == 'cross':
+            self.model = VisionGPT2Model.from_pretrained(self.model_config, self.args).to(self.device)
+        else:
+            self.model = GPT.from_pretrained(self.model_config, self.args).to(self.device)
+
         self.model.pretrained_layers_trainable(trainable=False)
 
         self.train_df, self.valid_df = self.load_dataframes(args)
         self.train_ds, self.valid_ds = make_datasets(self.train_df, self.valid_df)
         self.train_dl = make_train_dataloader(self.train_ds, self.train_config)
         self.val_dl = make_validation_dataloader(self.valid_ds, self.train_config)
-
-
 
         print(f'trainable parameters: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
 
@@ -94,8 +94,8 @@ class Trainer:
 
 
         return train_df, valid_df
-    def create_model_info_str(self, args):
-        name = f'e-{args.epochs}_t{args.temp}_lr{args.lr}_{args.model_name}'
+
+
     def save_model(self):
         # TODO: Check if we should store optimizer data
         if not self.args.local_mode:
@@ -126,7 +126,7 @@ class Trainer:
                 labels = labels.to(self.device)
 
                 # We can just call the model to call its forward method
-                loss = self.model(image, input_ids, labels)
+                loss = self.model.forward(image, input_ids, labels)
 
                 self.scaler.scale(loss).backward()
                 self.scaler.step(self.optim)
@@ -135,7 +135,9 @@ class Trainer:
                 self.optim.zero_grad(set_to_none=True)
 
                 running_loss += loss.item()
-                self.table["Train Loss"] = loss.item()
+
+                if not self.args.local_mode:
+                    self.table["Train Loss"] = loss.item()
 
             # Why do we do this?
             del image, input_ids, labels, loss
@@ -159,7 +161,8 @@ class Trainer:
 
                 loss = self.model(image, input_ids, labels)
                 running_loss += loss.item()
-                self.table["Valid Loss"] = loss.item()
+                if not self.args.local_mode:
+                    self.table["Valid Loss"] = loss.item()
 
             del image, input_ids, labels, loss
 
@@ -179,7 +182,8 @@ class Trainer:
         best_pxp = 1e9
         best_epoch = -1
         for epoch in range(self.train_config.epochs):
-            self.table["Epoch"] = f"{epoch}/{self.train_config.epochs}"
+            if not self.args.local_mode:
+                self.table["Epoch"] = f"{epoch}/{self.train_config.epochs}"
 
             if epoch == self.train_config.freeze_epochs_gpt:
                 self.model.unfreeze_gpt_layers()
@@ -204,8 +208,9 @@ class Trainer:
                 best_pxp = pxp
                 best_epoch = epoch
                 self.save_model()
-            self.table["Perplexity"] = pxp
-            self.table.next_row()
+            if not self.args.local_mode:
+                self.table["Perplexity"] = pxp
+                self.table.next_row()
 
 
 
