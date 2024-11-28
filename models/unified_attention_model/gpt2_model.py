@@ -64,6 +64,13 @@ class GPT(nn.Module):
                 layer.requires_grad = trainable
 
     def create_unified_input(self, token_ids, image):
+        '''
+        One fortunate thing is that the image sequences are all the same length,
+        so we don't need to worry about padding modifications. I'm pre-pending a
+        fixed-length image sequence to each of the text input sequences, so
+        the addition of the new items won't affect the padding at the end of the sequences,
+        and for a given batch the lengths of the training examples will still be uniform.
+        '''
 
         token_embeddings = self.transformer.wte(token_ids)
         positions = torch.arange(0, token_embeddings.size(1)).to(token_embeddings.device)

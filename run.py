@@ -3,6 +3,7 @@ from datetime import datetime
 
 from matplotlib import pyplot as plt
 
+import attention_scratch
 from constants import LOCAL_MODEL_LOCATION, REMOTE_MODEL_LOCATION
 
 warnings.filterwarnings("ignore")
