@@ -28,7 +28,7 @@ table = ProgressTable(["Epoch"],
 table.add_column("Train Loss", aggregate="mean", color="bold red")
 table.add_column("Valid Loss", aggregate="mean", color="bold red")
 table.add_column("Valid Perplexity", aggregate="mean")
-table.add_column("Learning Rare")
+table.add_column("Learning Rate")
 
 from constants import LOCAL_MODEL_LOCATION
 
