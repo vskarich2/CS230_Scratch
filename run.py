@@ -134,7 +134,7 @@ def compare_captions(test_img, test_caption, sampling_method, temp, file):
     print(result)
 
 
-def inference_test(trainer, args):
+def inference_test(trainer, file, args):
 
     if args.image_location != "":
         show_image(args.image_location, "Not provided", args.sampling_method, args.temp)
