@@ -22,7 +22,7 @@ class VisionGPT2Model(nn.Module):
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
-        # TODO: Why is pretrained set to False?
+
         vit = create_model(
             'vit_base_patch16_224',
             pretrained=False,
@@ -49,7 +49,6 @@ class VisionGPT2Model(nn.Module):
         self.lm_head = nn.Linear(config.embed_dim, config.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight
 
-    #TODO: Why is this method needed?
     def vit_pos_embed(self, x):
         pos_embed = self.pos_embed
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)

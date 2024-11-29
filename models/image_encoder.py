@@ -32,8 +32,8 @@ class ImageEncoder(nn.Module):
         patch_emb = self.patch_embed(image)
         pos_patch_emb = self.pos_embed(patch_emb)
 
-        hidden_state = None
+        hidden_state = pos_patch_emb
         for i in range(self.config.depth):
-            hidden_state = self.vision_blocks[i](pos_patch_emb) # TODO: Check the dimensions here.
+            hidden_state = self.vision_blocks[i](hidden_state)
 
         return hidden_state
