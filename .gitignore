@@ -1,7 +1,7 @@
 v/
 ENV/
 
-
+*.pyc
 
 # Spyder project settings
 .spyderproject
