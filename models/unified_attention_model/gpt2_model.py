@@ -21,6 +21,9 @@ class GPT(nn.Module):
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
+        # Note: the names of these parameter fields are meant to match the names of the
+        # state_dict for pre-trained GPT models
+
         self.transformer = nn.ModuleDict(dict(
             wte=nn.Embedding(config.vocab_size, config.embed_dim),  # This is the token embedding
             wpe=nn.Embedding(config.seq_len, config.embed_dim),  # This is the positional embedding
@@ -36,39 +39,44 @@ class GPT(nn.Module):
 
         self.image_encoder = ImageEncoder(self.config, self.args)
 
-    def pretrained_layers_trainable(self, trainable=False):
-        # Note: the names of these variables are meant to match the names of the
-        # state_dict for pre-trained GPT models
-
-        all_params = []
-
-        general_gpt_params = [
+        self.general_gpt_params = [
             self.transformer.wte,
             self.transformer.wpe,
             self.transformer.ln_f,
             self.lm_head
         ]
 
-        all_params.extend(general_gpt_params)
-
-        gpt_layers = [[
+        self.gpt_layers = [[
             self.transformer.h[i].ln_1,
             self.transformer.h[i].ln_2,
             self.transformer.h[i].attn,
             self.transformer.h[i].mlp
         ] for i in range(self.config.depth)]
 
-        for l in gpt_layers:
-            all_params.extend(l)
+        for l in self.gpt_layers:
+            self.general_gpt_params.extend(l)
 
-        vit_params = [
+        self.vit_params = [
             self.image_encoder.blocks,
             self.image_encoder.vit_pos_embed,
             self.image_encoder.vit_cls_token,
             self.image_encoder.vit_patch_embed
         ]
 
-        all_params.extend(vit_params)
+    def unfreeze_gpt_layers(self):
+
+        for layer in self.general_gpt_params:
+            if not isinstance(layer, nn.Parameter):
+                for p in layer.parameters():
+                    p.requires_grad = True
+            else:
+                layer.requires_grad = True
+
+    def pretrained_layers_trainable(self, trainable=False):
+
+        all_params = []
+        all_params.extend(self.general_gpt_params)
+        all_params.extend(self.vit_params)
 
         for layer in all_params:
             if not isinstance(layer, nn.Parameter):
@@ -126,8 +134,7 @@ class GPT(nn.Module):
         # If labels is not None, we are in training mode
         if labels is not None:
             # We need to get rid of the image sequences before we compute the logits
-            len_token_ids = token_ids.shape[1]
-            hidden_state = hidden_state[:, :len_token_ids, :]
+            hidden_state = self.remove_image_hidden_states(token_ids, hidden_state)
 
             # lm_head layer projects the hidden state dimension 768 to the vocab dimension 50257
             lm_logits = self.lm_head(hidden_state)
@@ -139,13 +146,15 @@ class GPT(nn.Module):
             return loss
 
         # This is inference mode text generation, where we predict the next token from last hidden state of the sequence
-        last_hidden_state = rearrange(
-            hidden_state,
-            'batch seq hidden - > batch 1 hidden', seq=-1
-        )
+        last_hidden_state = self.remove_image_hidden_states(token_ids, hidden_state)
 
         lm_logits = self.lm_head(last_hidden_state)
         return lm_logits
+
+    def remove_image_hidden_states(self, token_ids, hidden_state):
+        len_token_ids = token_ids.shape[1]
+        hidden_state = hidden_state[:, :len_token_ids, :]
+        return hidden_state
 
     def generate(self, image, token_ids_generated_so_far, max_tokens=50, temperature=1.0, sampling_method='argmax'):
         for _ in range(max_tokens):
@@ -178,24 +187,8 @@ class GPT(nn.Module):
                 break
 
         return token_ids_generated_so_far.cpu().flatten()
-    def unfreeze_gpt_layers(self):
-        gpt_layers = [[
-            self.transformer.h[i].ln_1,
-            self.transformer.h[i].ln_2,
-            self.transformer.h[i].attn,
-            self.transformer.h[i].mlp
-        ] for i in range(self.config.depth)]
 
-        flatten = []
-        for l in gpt_layers:
-            flatten.extend(l)
 
-        for layer in flatten:
-            if not isinstance(layer, nn.Parameter):
-                for p in layer.parameters():
-                    p.requires_grad = True
-            else:
-                layer.requires_grad = True
 
     @staticmethod
     def from_pretrained(config, args):

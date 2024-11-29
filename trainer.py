@@ -102,7 +102,7 @@ class Trainer:
             torch.save(sd, self.train_config.model_path / self.model_name)
 
     def load_best_model(self):
-        # TODO: Check if we should store optimizer data
+
         print(f'Loading best model...{self.model_name}')
         sd = torch.load(self.train_config.model_path / self.model_name)
         self.model.load_state_dict(sd)
@@ -137,12 +137,12 @@ class Trainer:
 
                 if not self.args.local_mode:
                     self.table["Train Loss"] = loss.item()
-                    self.table["Learning Rate"] = str(self.sched.get_last_lr())
+                    lr = self.sched.get_last_lr()
+                    self.table["Learning Rate"] = "{0:.6g}".format(lr[0])
 
             # Why do we do this?
             del image, input_ids, labels, loss
 
-        train_loss = running_loss / len(self.train_dl)
 
 
     @torch.no_grad()
@@ -207,18 +207,9 @@ class Trainer:
             if not self.args.local_mode:
                 self.table["Valid Perplexity"] = pxp
                 self.table.next_row()
-
-
-
-
-        return {
-            'best_perplexity': best_pxp,
-            'best_epoch': best_epoch,
-            'table': self.table
-        }
+        return
 
     @torch.no_grad()
-    # TODO: Understand what are all these variables
     def generate_caption(self, image, max_tokens=50, temperature=1.0, sampling_method='multinomial'):
         self.model.eval()
 

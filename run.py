@@ -21,7 +21,7 @@ from trainer import Trainer
 def get_device(args):
     if torch.cuda.is_available():
         device = "cuda"
-    elif torch.backends.mps.is_available() and not args.infer_only:
+    elif torch.backends.mps.is_available() and args.train:
         device = "mps"
     else:
         device = "cpu"
@@ -46,7 +46,9 @@ def get_args():
     parser.add_argument("--unfreeze_all", type=int, default=5)
 
     parser.add_argument("--use_gpu", action='store_true')
-    parser.add_argument("--infer_only", action='store_true')
+
+    parser.add_argument("--train", action='store_true')
+
     parser.add_argument("--local_mode", action='store_true')
     parser.add_argument("--is_linux", action='store_true')
     parser.add_argument("--mode", type=str, default="cross")
@@ -122,7 +124,6 @@ def show_image(test_img, test_caption, sampling_method, temp):
     plt.show()
 
 def compare_captions(test_img, test_caption, sampling_method, temp, file):
-
     gen_caption = trainer.generate_caption(
         test_img,
         temperature=temp,
@@ -136,49 +137,37 @@ def compare_captions(test_img, test_caption, sampling_method, temp, file):
 
 def inference_test(trainer, file, args):
 
-    if args.image_location != "":
-        show_image(args.image_location, "Not provided", args.sampling_method, args.temp)
-    else:
-        for i in range(50):
-            # Generate a caption for one image at a time
-            test = trainer.valid_df.sample(n=1).values[0]
-            test_img, test_caption = test[0], test[1]
-            if args.is_linux:
-                compare_captions(
-                    test_img,
-                    test_caption,
-                    args.sampling_method,
-                    args.temp,
-                    file
-                )
-            else:
-                show_image(test_img, test_caption, args.sampling_method, args.temp)
-        file.close()
+    #show_image(args.image_location, "caption", args.sampling_method, args.temp)
+
+    for i in range(50):
+        test = trainer.valid_df.sample(n=1).values[0]
+        test_img, test_caption = test[0], test[1]
+        compare_captions(
+            test_img,
+            test_caption,
+            args.sampling_method,
+            args.temp,
+            file
+        )
 
 if __name__ == "__main__":
     args = get_args()
     seed_everything(args.seed)
     trainer = setup(args)
+    file_path = trainer.train_config.model_path / f'{trainer.model_name}.txt'
 
-    if args.infer_only:
-        if args.local_mode:
-            trainer.load_local_model()
-        else:
-            trainer.load_best_model()
-            with open(trainer.train_config.model_path / f'{trainer.model_name}.txt', "w") as file:
-                inference_test(trainer, file, args)
-    else:
+    if args.train:
         result = trainer.fit()
-        trainer.load_best_model()
+        if not args.local_mode: # Use pre-trained weights locally because of mixed precision issues
+            trainer.load_best_model()
 
-        with open(trainer.train_config.model_path / f'{trainer.model_name}.txt', "w") as file:
-            if not args.local_mode:
-                file.write(result['table'].to_df().dropna().to_string())
+    with open(file_path, "w") as file:
+        if not args.local_mode:
+            file.write(trainer.table.to_df().dropna().to_string())
+            trainer.table.close()
 
-            inference_test(trainer, file, args)
-            if not args.local_mode:
-                result['table'].close()
-            file.close()
+        inference_test(trainer, file, args)
+        file.close()
 
 
 
