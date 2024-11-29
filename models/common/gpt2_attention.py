@@ -1,4 +1,7 @@
 import warnings
+
+from constants import NUM_IMAGE_TOKENS
+
 warnings.filterwarnings("ignore")
 import torch
 import torch.nn as nn
@@ -24,10 +27,8 @@ class GPT2Attention(nn.Module):
         self.scale = self.head_size ** -0.5
 
         combined_mask = self.create_unified_attention_mask()
-        vanilla_mask = torch.tril(torch.ones(1, 1, self.seq_len, self.seq_len))
 
         self.register_buffer('mask', combined_mask.unsqueeze(0).unsqueeze(0))
-        #self.register_buffer('mask', vanilla_mask)
 
         self.c_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
 
@@ -35,22 +36,22 @@ class GPT2Attention(nn.Module):
         self.resid_dropout = nn.Dropout(config.residual_dropout)
 
     def create_unified_attention_mask(self):
-        num_image_tokens = 197
+
         seq_len = self.seq_len  # Total sequence length (image tokens + text tokens)
 
         # Create the full lower triangular mask for seq_len x seq_len
         full_mask = torch.tril(torch.ones(seq_len, seq_len))
 
         # Restrict image tokens (0:197) to only attend to image tokens (0:197)
-        image_mask = full_mask[:num_image_tokens, :num_image_tokens]
+        image_mask = full_mask[:NUM_IMAGE_TOKENS, :NUM_IMAGE_TOKENS]
 
         # Allow text tokens (197:seq_len) to attend to both image tokens and previous text tokens
-        text_mask = full_mask[num_image_tokens:, :]
+        text_mask = full_mask[NUM_IMAGE_TOKENS:, :]
 
         # Combine image_mask and text_mask into a full seq_len x seq_len mask
         combined_mask = torch.zeros(seq_len, seq_len)
-        combined_mask[:num_image_tokens, :num_image_tokens] = image_mask  # Image-to-image
-        combined_mask[num_image_tokens:, :] = text_mask  # Text-to-image and text-to-text
+        combined_mask[:NUM_IMAGE_TOKENS, :NUM_IMAGE_TOKENS] = image_mask  # Image-to-image
+        combined_mask[NUM_IMAGE_TOKENS:, :] = text_mask  # Text-to-image and text-to-text
 
         return combined_mask
     def forward(self, x):
@@ -64,7 +65,6 @@ class GPT2Attention(nn.Module):
 
         qk_t = (q @ k.transpose(-2, -1)) * self.scale
         qk_t = qk_t.masked_fill(self.mask[:, :, :seq_len, :seq_len] == 0, float('-inf'))
-
 
         qk_t = F.softmax(qk_t, dim=-1)
         weights = self.attn_dropout(qk_t)

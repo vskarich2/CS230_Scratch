@@ -2,6 +2,7 @@ import warnings
 
 import torch
 
+from constants import EOS_TOKEN_ID
 from models.image_encoder import ImageEncoder
 from models.unified_attention_model.gpt2_transformer import GPT2Block
 import torch.nn.functional as F
@@ -133,10 +134,43 @@ class GPT(nn.Module):
         lm_logits = self.lm_head(last_hidden_state)
         return lm_logits
 
+    def generate(self, image, token_ids_generated_so_far, max_tokens=50, temperature=1.0, sampling_method='argmax'):
+        for _ in range(max_tokens):
+            # Initially during generation, the tokens tensor only contains token 50256, the start token
+
+            # Batch Size x 1 x Vocab Size
+            logits = self.forward(image, token_ids_generated_so_far)
+
+            # Note that this slice operation will remove the sequence length dimension.
+            scaled_logits = logits[:, -1, :] / temperature
+
+            # Note that only selecting the last element of the sequence dimension eliminates that dimension
+            # So we go from a shape of [batch, sequence, vocab] to [batch, vocab].
+            # This 2D tensor is what softmax is expecting.
+            probs = F.softmax(scaled_logits, dim=-1)
+
+            if sampling_method == 'argmax':
+                next_token_id = torch.argmax(probs, dim=-1, keepdim=True)
+            else:
+                try:
+                    next_token_id = torch.multinomial(probs, num_samples=1)
+                except Exception as e:
+                    print(e)
+                    next_token_id = torch.tensor([[EOS_TOKEN_ID]]).to(token_ids_generated_so_far.device)
+
+            # Append newly generated token to current token sequence
+            token_ids_generated_so_far = torch.cat([token_ids_generated_so_far, next_token_id], dim=1)
+
+            if next_token_id.item() == EOS_TOKEN_ID:
+                break
+
+        return token_ids_generated_so_far.cpu().flatten()
     def unfreeze_gpt_layers(self):
         gpt_layers = [[
-            self.transformer.h[i].ln_1, self.transformer.h[i].ln_2,
-            self.transformer.h[i].attn, self.transformer.h[i].mlp
+            self.transformer.h[i].ln_1,
+            self.transformer.h[i].ln_2,
+            self.transformer.h[i].attn,
+            self.transformer.h[i].mlp
         ] for i in range(self.config.depth)]
 
         flatten = []

@@ -86,7 +86,7 @@ class VisionGPT2Model(nn.Module):
                 layer.requires_grad = trainable
 
 
-    def unfreeze_gpt_layers(self, ):
+    def unfreeze_gpt_layers(self):
         gpt_layers = [[
             self.transformer.h[i].ln_1, self.transformer.h[i].ln_2,
             self.transformer.h[i].attn, self.transformer.h[i].mlp
