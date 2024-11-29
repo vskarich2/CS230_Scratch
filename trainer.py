@@ -27,7 +27,8 @@ table = ProgressTable(["Epoch"],
                       )
 table.add_column("Train Loss", aggregate="mean", color="bold red")
 table.add_column("Valid Loss", aggregate="mean", color="bold red")
-table.add_column("Perplexity", aggregate="mean")
+table.add_column("Valid Perplexity", aggregate="mean")
+table.add_column("Learning Rare")
 
 from constants import LOCAL_MODEL_LOCATION
 
@@ -62,7 +63,7 @@ class Trainer:
 
         print(f'trainable parameters: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
 
-        # TODO: What is GradScalar?
+        # This is necessary because of lower-cost mixed-precision training
         self.scaler = GradScaler()
 
         total_steps = len(self.train_dl)
@@ -74,9 +75,6 @@ class Trainer:
             epochs=self.train_config.epochs,
             steps_per_epoch=total_steps
         )
-
-        self.metrics = pd.DataFrame()
-        self.metrics[['train_loss', 'train_perplexity', 'val_loss', 'val_perplexity']] = None
 
         self.tfms = transforms.Compose([
             transforms.Resize(size=(224, 224)),
@@ -119,7 +117,8 @@ class Trainer:
 
         running_loss = 0.
         for image, input_ids, labels in self.table(self.train_dl):
-            # TODO: What is autocast?
+
+            # This is necessary because of lower-cost mixed-precision training
             with autocast():
                 image = image.to(self.device)
                 input_ids = input_ids.to(self.device)
@@ -138,14 +137,13 @@ class Trainer:
 
                 if not self.args.local_mode:
                     self.table["Train Loss"] = loss.item()
+                    self.table["Learning Rate"] = str(self.sched.get_last_lr())
 
             # Why do we do this?
             del image, input_ids, labels, loss
 
         train_loss = running_loss / len(self.train_dl)
-        train_pxp = np.exp(train_loss)
 
-        self.metrics.loc[epoch, ['train_loss', 'train_perplexity']] = (train_loss, train_pxp)
 
     @torch.no_grad()
     def valid_one_epoch(self, epoch):
@@ -154,6 +152,7 @@ class Trainer:
         running_loss = 0.
 
         for image, input_ids, labels in table(self.val_dl):
+            # This is necessary because of lower-cost mixed-precision training
             with autocast():
                 image = image.to(self.device)
                 input_ids = input_ids.to(self.device)
@@ -169,15 +168,13 @@ class Trainer:
         val_loss = running_loss / len(self.val_dl)
         val_pxp = np.exp(val_loss)
 
-        self.metrics.loc[epoch, ['val_loss', 'val_perplexity']] = (val_loss, val_pxp)
-
         return val_pxp
 
     def clean(self):
         gc.collect()
         torch.cuda.empty_cache()
 
-    def fit(self, ):
+    def fit(self):
 
         best_pxp = 1e9
         best_epoch = -1
@@ -208,7 +205,7 @@ class Trainer:
                 best_epoch = epoch
                 self.save_model()
             if not self.args.local_mode:
-                self.table["Perplexity"] = pxp
+                self.table["Valid Perplexity"] = pxp
                 self.table.next_row()
 
 

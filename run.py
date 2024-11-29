@@ -42,8 +42,8 @@ def get_args():
     parser.add_argument("--shortcut", action='store_true')
     parser.add_argument("--sample_size", type=int, default=1000)
 
-    parser.add_argument("--unfreeze_gpt", type=int, default=7)
-    parser.add_argument("--unfreeze_all", type=int, default=8)
+    parser.add_argument("--unfreeze_gpt", type=int, default=100)
+    parser.add_argument("--unfreeze_all", type=int, default=5)
 
     parser.add_argument("--use_gpu", action='store_true')
     parser.add_argument("--infer_only", action='store_true')
