@@ -194,7 +194,6 @@ class Trainer:
             # Put model in training mode, as opposed to eval mode
             self.model.train()
 
-
             self.train_one_epoch(epoch)
             self.clean()
 

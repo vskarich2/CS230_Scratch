@@ -40,12 +40,16 @@ class GPT(nn.Module):
         # Note: the names of these variables are meant to match the names of the
         # state_dict for pre-trained GPT models
 
-        layers = [
+        all_params = []
+
+        general_gpt_params = [
             self.transformer.wte,
             self.transformer.wpe,
             self.transformer.ln_f,
             self.lm_head
         ]
+
+        all_params.extend(general_gpt_params)
 
         gpt_layers = [[
             self.transformer.h[i].ln_1,
@@ -55,9 +59,18 @@ class GPT(nn.Module):
         ] for i in range(self.config.depth)]
 
         for l in gpt_layers:
-            layers.extend(l)
+            all_params.extend(l)
 
-        for layer in layers:
+        vit_params = [
+            self.image_encoder.blocks,
+            self.image_encoder.vit_pos_embed,
+            self.image_encoder.vit_cls_token,
+            self.image_encoder.vit_patch_embed
+        ]
+
+        all_params.extend(vit_params)
+
+        for layer in all_params:
             if not isinstance(layer, nn.Parameter):
                 for p in layer.parameters():
                     p.requires_grad = trainable
