@@ -39,7 +39,7 @@ class Trainer:
         if self.args.local_mode:
             self.table.close()
 
-        self.model_name = args.model_name
+        self.model_name = train_config.model_name
         self.train_config = train_config
         self.model_config = model_config
 

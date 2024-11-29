@@ -154,7 +154,7 @@ def inference_test(trainer, file, args):
                 )
             else:
                 show_image(test_img, test_caption, args.sampling_method, args.temp)
-
+        file.close()
 
 if __name__ == "__main__":
     args = get_args()
