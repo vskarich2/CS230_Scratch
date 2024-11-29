@@ -33,11 +33,16 @@ class Dataset:
         image = Image.open(image).convert('RGB')
         image = self.tfms(image)
         caption = f"{caption}<|endoftext|>"
+
         input_ids = tokenizer(
             caption,
             truncation=True)['input_ids']
         labels = input_ids.copy()
+
+        # This shifts the labels by one so that we can compare the next token probabilities
+        # Note that labels now has two EOS tokens at the end
         labels[:-1] = input_ids[1:]
+
         return image, input_ids, labels
 
 
@@ -46,20 +51,24 @@ def collate_fn(batch):
     input_ids = [i[1] for i in batch]
     labels = [i[2] for i in batch]
     image = torch.stack(image, dim=0)
+
     input_ids = tokenizer.pad(
         {'input_ids': input_ids},
         padding='longest',
         return_attention_mask=False,
         return_tensors='pt'
     )['input_ids']
+
     labels = tokenizer.pad(
         {'input_ids': labels},
         padding='longest',
         return_attention_mask=False,
         return_tensors='pt'
     )['input_ids']
+
+    # The pad token id is 50256
     mask = (input_ids != tokenizer.pad_token_id).long()
-    labels[mask == 0] = -100
+    labels[mask == 0] = -100 # This is done to exclude the padding tokens from the loss function
     return image, input_ids, labels
 
 # Why are all these values 0.5?
@@ -128,7 +137,7 @@ def make_train_dataloader(ds, train_config):
         batch_size=train_config.batch_size,
         shuffle=True,
         pin_memory=True,
-        num_workers=2,
+        num_workers=train_config.num_workers,
         persistent_workers=True,
         collate_fn=collate_fn
     )
@@ -139,7 +148,7 @@ def make_validation_dataloader(ds, train_config):
         batch_size=train_config.batch_size,
         shuffle=False,
         pin_memory=True,
-        num_workers=2,
+        num_workers=train_config.num_workers,
         persistent_workers=True,
         collate_fn=collate_fn
     )

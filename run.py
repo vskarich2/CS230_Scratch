@@ -1,7 +1,9 @@
 import warnings
+from datetime import datetime
 
 from matplotlib import pyplot as plt
 
+import attention_scratch
 from constants import LOCAL_MODEL_LOCATION, REMOTE_MODEL_LOCATION
 
 warnings.filterwarnings("ignore")
@@ -26,6 +28,11 @@ def get_device(args):
     print(f"Using device: {device}")
     return device
 
+def create_model_name(args):
+    model_timestamp = datetime.now().strftime("%b-%d-%H:%M")
+    model_details = f'mode={args.mode},epochs={args.epochs},lr={args.lr}'
+    model_name = f'{model_timestamp}_{model_details}'
+    return model_name
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -42,7 +49,8 @@ def get_args():
     parser.add_argument("--infer_only", action='store_true')
     parser.add_argument("--local_mode", action='store_true')
     parser.add_argument("--is_linux", action='store_true')
-
+    parser.add_argument("--mode", type=str, default="cross")
+    parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--image_location", type=str, default="")
     parser.add_argument("--model_name", type=str, default="captioner.pt")
@@ -64,6 +72,7 @@ def seed_everything(seed=11711):
     torch.backends.cudnn.deterministic = True
 
 def setup(args):
+
     if args.local_mode:
         model_path = LOCAL_MODEL_LOCATION
     else:
@@ -89,7 +98,9 @@ def setup(args):
         lr=args.lr,
         device=get_device(args),
         model_path=Path(model_path),
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        model_name=create_model_name(args)
     )
 
     trainer = Trainer(model_config, train_config, args)
@@ -123,12 +134,13 @@ def compare_captions(test_img, test_caption, sampling_method, temp, file):
     print(result)
 
 
-def inference_test(trainer, file, args):
+def inference_test(trainer, args):
 
     if args.image_location != "":
         show_image(args.image_location, "Not provided", args.sampling_method, args.temp)
     else:
         for i in range(50):
+            # Generate a caption for one image at a time
             test = trainer.valid_df.sample(n=1).values[0]
             test_img, test_caption = test[0], test[1]
             if args.is_linux:
@@ -160,9 +172,12 @@ if __name__ == "__main__":
         trainer.load_best_model()
 
         with open(trainer.train_config.model_path / f'{trainer.model_name}.txt', "w") as file:
-            file.write(result['table'].to_df().dropna().to_string())
+            if not args.local_mode:
+                file.write(result['table'].to_df().dropna().to_string())
+
             inference_test(trainer, file, args)
-            result['table'].close()
+            if not args.local_mode:
+                result['table'].close()
             file.close()
 
 
