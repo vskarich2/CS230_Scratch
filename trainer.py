@@ -61,8 +61,6 @@ class Trainer:
         self.train_dl = make_train_dataloader(self.train_ds, self.train_config)
         self.val_dl = make_validation_dataloader(self.valid_ds, self.train_config)
 
-        print(f'trainable parameters: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
-
         # This is necessary because of lower-cost mixed-precision training
         self.scaler = GradScaler()
 
@@ -180,7 +178,7 @@ class Trainer:
         best_epoch = -1
         for epoch in range(self.train_config.epochs):
             if not self.args.local_mode:
-                self.table["Epoch"] = f"{epoch}/{self.train_config.epochs}"
+                self.table["Epoch"] = f"{epoch + 1}/{self.train_config.epochs}"
 
             if epoch == self.train_config.freeze_epochs_gpt:
                 self.model.unfreeze_gpt_layers()
