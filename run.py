@@ -31,7 +31,7 @@ def get_device(args):
 def create_model_name(args):
     model_timestamp = datetime.now().strftime("%b-%d-%H:%M")
     model_details = f'mode={args.mode},epochs={args.epochs},lr={args.lr}'
-    model_name = f'{model_timestamp}_{model_details}'
+    model_name = f'{model_timestamp}_{model_details}_{args.model_name}'
     return model_name
 
 def get_args():
@@ -144,7 +144,6 @@ def inference_test(trainer, file, args):
             test = trainer.valid_df.sample(n=1).values[0]
             test_img, test_caption = test[0], test[1]
             if args.is_linux:
-
                 compare_captions(
                     test_img,
                     test_caption,
@@ -166,7 +165,8 @@ if __name__ == "__main__":
             trainer.load_local_model()
         else:
             trainer.load_best_model()
-        inference_test(trainer, args)
+            with open(trainer.train_config.model_path / f'{trainer.model_name}.txt', "w") as file:
+                inference_test(trainer, file, args)
     else:
         result = trainer.fit()
         trainer.load_best_model()
