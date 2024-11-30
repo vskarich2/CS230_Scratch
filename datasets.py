@@ -119,7 +119,7 @@ def load_coco_data(args):
 
     df = df.reset_index(drop=True)
 
-    train_df, val_df = train_test_split(df, test_size=0.1)
+    train_df, val_df = train_test_split(df, test_size=0.05)
     train_df.reset_index(drop=True, inplace=True)
     val_df.reset_index(drop=True, inplace=True)
     print(f'train size: {len(train_df)}')

@@ -2,6 +2,7 @@ import warnings
 from datetime import datetime
 
 from matplotlib import pyplot as plt
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 from constants import LOCAL_MODEL_LOCATION, REMOTE_MODEL_LOCATION
 
@@ -129,16 +130,30 @@ def compare_captions(test_img, test_caption, sampling_method, temp, file):
         sampling_method=sampling_method
     )
 
-    result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
+    smoothing_function = SmoothingFunction().method1
+    references = [test_caption.split()]
+    bleu_score = sentence_bleu(references, gen_caption.split(), smoothing_function=smoothing_function)
+
+    result = f"BLEU: {bleu_score}\n img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
     file.write(result)
     print(result)
+
+def compare_captions_just_bleu(test_img, test_caption, sampling_method, temp):
+    gen_caption = trainer.generate_caption(
+        test_img,
+        temperature=temp,
+        sampling_method=sampling_method
+    )
+
+    smoothing_function = SmoothingFunction().method1
+    references = [test_caption.split()]
+    bleu_score = sentence_bleu(references, gen_caption.split(), smoothing_function=smoothing_function)
+    return bleu_score
 
 
 def inference_test(trainer, file, args):
 
-    #show_image(args.image_location, "caption", args.sampling_method, args.temp)
-
-    for i in range(50):
+    for i in range(100):
         test = trainer.valid_df.sample(n=1).values[0]
         test_img, test_caption = test[0], test[1]
         compare_captions(
@@ -148,6 +163,18 @@ def inference_test(trainer, file, args):
             args.temp,
             file
         )
+def bleu_score_inference_test(trainer, args):
+
+    for i in range(1000):
+        test = trainer.valid_df.sample(n=1).values[0]
+        test_img, test_caption = test[0], test[1]
+        compare_captions_just_bleu(
+            test_img,
+            test_caption,
+            args.sampling_method,
+            args.temp,
+        )
+
 
 if __name__ == "__main__":
     args = get_args()

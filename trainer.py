@@ -1,6 +1,7 @@
 import warnings
 from datetime import datetime
 
+from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from progress_table import ProgressTable
 from datasets import load_local_data, load_coco_data, make_train_dataloader, make_validation_dataloader, make_datasets
 from models.unified_attention_model.gpt2_unified_model import GPT
@@ -28,6 +29,7 @@ table = ProgressTable(["Epoch"],
 table.add_column("Train Loss", aggregate="mean", color="bold red")
 table.add_column("Valid Loss", aggregate="mean", color="bold red")
 table.add_column("Valid Perplexity", aggregate="mean")
+table.add_column("Test BLEU", aggregate="mean")
 table.add_column("Learning Rate")
 
 from constants import LOCAL_MODEL_LOCATION
@@ -122,12 +124,14 @@ class Trainer:
                 input_ids = input_ids.to(self.device)
                 labels = labels.to(self.device)
 
-                # We can just call the model to call its forward method
                 loss = self.model.forward(image, input_ids, labels)
 
+                # This is required due to mixed-precision training.
                 self.scaler.scale(loss).backward()
                 self.scaler.step(self.optim)
                 self.scaler.update()
+
+
                 self.sched.step()
                 self.optim.zero_grad(set_to_none=True)
 
@@ -166,7 +170,37 @@ class Trainer:
         val_loss = running_loss / len(self.val_dl)
         val_pxp = np.exp(val_loss)
 
+        with autocast():
+            self.test_one_epoch()
+
         return val_pxp
+
+
+    def test_one_epoch(self):
+        def compare_captions_just_bleu(test_img, test_caption, sampling_method, temp):
+            gen_caption = self.generate_caption(
+                test_img,
+                temperature=temp,
+                sampling_method=sampling_method
+            )
+
+            smoothing_function = SmoothingFunction().method1
+            references = [test_caption.split()]
+            bleu_score = sentence_bleu(references, gen_caption.split(), smoothing_function=smoothing_function)
+            return bleu_score
+
+        for i in range(1000):
+            test = self.valid_df.sample(n=1).values[0]
+            test_img, test_caption = test[0], test[1]
+            bleu_score = compare_captions_just_bleu(
+                test_img,
+                test_caption,
+                self.args.sampling_method,
+                self.args.temp,
+            )
+
+            self.table["Test BLEU"] = bleu_score
+
 
     def clean(self):
         gc.collect()
@@ -196,6 +230,7 @@ class Trainer:
             self.model.eval()
 
             pxp = self.valid_one_epoch(epoch)
+
             self.clean()
 
             if pxp < best_pxp:
