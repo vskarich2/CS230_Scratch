@@ -10,8 +10,9 @@ import torch.nn.functional as F
 class GPT2UnifiedAttention(nn.Module):
     def __init__(self, config):
 
-        # Image tokens can only attend to previous image tokens.
+        # Image tokens can attend to all image tokens but not text tokens.
         # Text tokens can attend to both image tokens and previous text tokens.
+        # The sequence order is image_tokens + text_tokens
 
         super().__init__()
         self.embed_dim = config.embed_dim
@@ -47,7 +48,7 @@ class GPT2UnifiedAttention(nn.Module):
         # Allow text tokens (197:seq_len) to attend to both image tokens and previous text tokens
         text_mask = full_mask[NUM_IMAGE_TOKENS:, :]
 
-        # Combine image_mask and text_mask into a full seq_len x seq_len mask
+        # Combine image_mask and text_mask into full seq_len x seq_len mask
         combined_mask = torch.zeros(seq_len, seq_len)
         combined_mask[:NUM_IMAGE_TOKENS, :NUM_IMAGE_TOKENS] = image_mask  # Image-to-image
         combined_mask[NUM_IMAGE_TOKENS:, :] = text_mask  # Text-to-image and text-to-text
