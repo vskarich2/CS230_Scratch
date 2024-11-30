@@ -108,7 +108,7 @@ class GPT(nn.Module):
 
         pos_image_embeddings = self.image_encoder.vit_pos_embed + image_embeddings
 
-        unified_embeddings = torch.concat((text_embeddings, pos_image_embeddings), dim=1)
+        unified_embeddings = torch.concat((pos_image_embeddings, text_embeddings), dim=1)
 
         return unified_embeddings
 

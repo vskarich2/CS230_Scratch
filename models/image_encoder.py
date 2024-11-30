@@ -29,10 +29,12 @@ class ImageEncoder(nn.Module):
 
     def forward(self, image):
 
+        # "Tokenizes" the image into 16x16 patches
         patch_emb = self.patch_embed(image)
         pos_patch_emb = self.pos_embed(patch_emb)
 
         hidden_state = pos_patch_emb
+
         for i in range(self.config.depth):
             hidden_state = self.vision_blocks[i](hidden_state)
 
