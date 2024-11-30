@@ -1,6 +1,6 @@
 import warnings
 
-from constants import REMOTE_COCO_DATA_LOCATION
+from constants import REMOTE_COCO_DATA_LOCATION, REMOTE_DISTANCE_DATA_LOCATION, LOCAL_DISTANCE_DATA_LOCATION
 
 warnings.filterwarnings("ignore")
 import json
@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from transformers import GPT2TokenizerFast
 
-import torchvision.transforms as transforms
+import torchvision.transforms.v2 as transforms
 
 tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
 tokenizer.pad_token = tokenizer.eos_token
@@ -71,10 +71,13 @@ def collate_fn(batch):
     labels[mask == 0] = -100 # This is done to exclude the padding tokens from the loss function
     return image, input_ids, labels
 
-# Why are all these values 0.5?
 train_tfms = transforms.Compose([
     transforms.Resize(size=(224, 224)),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),  # Random color jitter
+    transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),  # Apply Gaussian blur
     transforms.ToTensor(),
+    transforms.GaussianNoise(),
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 valid_tfms = transforms.Compose([
@@ -92,6 +95,32 @@ def load_local_data(args):
 
     df = df.sample(64)
     df = df.reset_index(drop=True)
+
+    train_df, val_df = train_test_split(df, test_size=0.1)
+    train_df.reset_index(drop=True, inplace=True)
+    val_df.reset_index(drop=True, inplace=True)
+
+    return train_df, val_df
+
+def load_distance_data(args):
+    base_path = Path()
+    if args.local_mode:
+        base_path = Path(LOCAL_DISTANCE_DATA_LOCATION)
+    else:
+        base_path = Path(REMOTE_DISTANCE_DATA_LOCATION)
+
+
+    df = pd.read_csv(base_path / 'processed_captions.csv', index_col=0)
+
+    df.dropna(axis=0, how='any', inplace=True)
+
+    df['image'] = df['img_url'].map(lambda x: base_path / 'images' / x.strip())
+
+    caption_col = 'caption_str_2' if args.distance_word else 'caption_str_1'
+
+    df['caption'] = df[caption_col].map(lambda x: x.strip().lower())
+
+    df = df[['image', 'caption']]
 
     train_df, val_df = train_test_split(df, test_size=0.1)
     train_df.reset_index(drop=True, inplace=True)

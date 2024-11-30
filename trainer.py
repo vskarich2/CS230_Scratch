@@ -3,7 +3,8 @@ from datetime import datetime
 
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 from progress_table import ProgressTable
-from datasets import load_local_data, load_coco_data, make_train_dataloader, make_validation_dataloader, make_datasets
+from datasets import load_local_data, load_coco_data, make_train_dataloader, make_validation_dataloader, make_datasets, \
+    load_distance_data
 from models.unified_attention_model.gpt2_unified_model import GPT
 
 warnings.filterwarnings("ignore")
@@ -81,14 +82,22 @@ class Trainer:
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ])
+
     def load_dataframes(self, args):
         if args.local_mode:
-            train_df, valid_df = load_local_data(args)
+            if args.data == 'local':
+                train_df, valid_df = load_local_data(args)
+            elif args.data == 'distance':
+                train_df, valid_df = load_distance_data(args)
         else:
-            train_df, valid_df = load_coco_data(args)
-            if args.sample:
-                train_df = train_df.sample(args.sample_size)
-                valid_df = valid_df.sample(int(args.sample_size * 0.1))
+            if args.data == 'distance':
+                train_df, valid_df = load_distance_data(args)
+            else:
+                train_df, valid_df = load_coco_data(args)
+                if args.sample:
+                    train_df = train_df.sample(args.sample_size)
+                    valid_df = valid_df.sample(int(args.sample_size * 0.1))
+
 
 
         return train_df, valid_df

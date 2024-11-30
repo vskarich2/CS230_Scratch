@@ -49,7 +49,12 @@ def get_args():
 
     parser.add_argument("--train", action='store_true')
 
+    parser.add_argument("--data", type=str, default="local")
+
     parser.add_argument("--local_mode", action='store_true')
+
+    parser.add_argument("--distance_word", action='store_true')
+
     parser.add_argument("--is_linux", action='store_true')
     parser.add_argument("--mode", type=str, default="cross")
     parser.add_argument("--num_workers", type=int, default=4)
