@@ -3,7 +3,7 @@ from datetime import datetime
 
 from progress_table import ProgressTable
 from datasets import load_local_data, load_coco_data, make_train_dataloader, make_validation_dataloader, make_datasets
-from models.unified_attention_model.gpt2_model import GPT
+from models.unified_attention_model.gpt2_unified_model import GPT
 
 warnings.filterwarnings("ignore")
 

@@ -2,9 +2,9 @@ import warnings
 
 import torch
 
-from constants import EOS_TOKEN_ID
+from constants import EOS_TOKEN_ID, NUM_IMAGE_TOKENS
 from models.image_encoder import ImageEncoder
-from models.unified_attention_model.gpt2_transformer import GPT2Block
+from models.unified_attention_model.gpt2_unified_transformer import GPT2UnifiedBlock
 import torch.nn.functional as F
 from einops import rearrange
 
@@ -28,7 +28,7 @@ class GPT(nn.Module):
             wte=nn.Embedding(config.vocab_size, config.embed_dim),  # This is the token embedding
             wpe=nn.Embedding(config.seq_len, config.embed_dim),  # This is the positional embedding
             drop=nn.Dropout(config.emb_dropout),
-            h=nn.ModuleList([GPT2Block(config, self.args) for _ in range(config.depth)]),
+            h=nn.ModuleList([GPT2UnifiedBlock(config, self.args) for _ in range(config.depth)]),
             ln_f=nn.LayerNorm(config.embed_dim)
         ))
 
@@ -108,6 +108,7 @@ class GPT(nn.Module):
 
         pos_image_embeddings = self.image_encoder.vit_pos_embed + image_embeddings
 
+        # The text tokens are appended to the image tokens, this ordering is important for masking in unified attention.
         unified_embeddings = torch.concat((pos_image_embeddings, text_embeddings), dim=1)
 
         return unified_embeddings
@@ -134,7 +135,7 @@ class GPT(nn.Module):
         # If labels is not None, we are in training mode
         if labels is not None:
             # We need to get rid of the image sequences before we compute the logits
-            hidden_state = self.remove_image_hidden_states(token_ids, hidden_state)
+            hidden_state = self.remove_image_hidden_states(hidden_state)
 
             # lm_head layer projects the hidden state dimension 768 to the vocab dimension 50257
             lm_logits = self.lm_head(hidden_state)
@@ -146,14 +147,14 @@ class GPT(nn.Module):
             return loss
 
         # This is inference mode text generation, where we predict the next token from last hidden state of the sequence
-        last_hidden_state = self.remove_image_hidden_states(token_ids, hidden_state)
+        last_hidden_state = self.remove_image_hidden_states(hidden_state)
 
         lm_logits = self.lm_head(last_hidden_state)
         return lm_logits
 
-    def remove_image_hidden_states(self, token_ids, hidden_state):
-        len_token_ids = token_ids.shape[1]
-        hidden_state = hidden_state[:, :len_token_ids, :]
+    # Note that
+    def remove_image_hidden_states(self, hidden_state):
+        hidden_state = hidden_state[:, NUM_IMAGE_TOKENS:, :]
         return hidden_state
 
     def generate(self, image, token_ids_generated_so_far, max_tokens=50, temperature=1.0, sampling_method='argmax'):

@@ -7,11 +7,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-class GPT2Attention(nn.Module):
+class GPT2UnifiedAttention(nn.Module):
     def __init__(self, config):
 
-        # Image tokens can only attend to previous image tokens (not text tokens).
+        # Image tokens can only attend to previous image tokens.
         # Text tokens can attend to both image tokens and previous text tokens.
 
         super().__init__()
