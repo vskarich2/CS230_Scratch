@@ -212,7 +212,7 @@ class Trainer:
             bleu_score = sentence_bleu(references, gen_caption.split(), smoothing_function=smoothing_function)
             return bleu_score
 
-        for i in range(1000):
+        for i in range(self.args.bleu_count):
             test = self.valid_df.sample(n=1).values[0]
             test_img, test_caption = test[0], test[1]
             bleu_score = compare_captions_just_bleu(

@@ -64,6 +64,7 @@ def get_args():
     parser.add_argument("--model_name", type=str, default="captioner.pt")
     parser.add_argument("--sampling_method", type=str, default="multinomial")
     parser.add_argument("--temp", type=float, default=1.0)
+    parser.add_argument("--bleu_count", type=int, default=100)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-4)
 
