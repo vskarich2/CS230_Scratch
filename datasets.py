@@ -71,15 +71,24 @@ def collate_fn(batch):
     labels[mask == 0] = -100 # This is done to exclude the padding tokens from the loss function
     return image, input_ids, labels
 
-train_tfms = transforms.Compose([
-    transforms.Resize(size=(224, 224)),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),  # Random color jitter
-    transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),  # Apply Gaussian blur
-    transforms.ToTensor(),
-    transforms.GaussianNoise(),
-    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-])
+def create_train_tfms(args):
+    if args.use_aug:
+        train_tfms = transforms.Compose([
+            transforms.Resize(size=(224, 224)),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),  # Random color jitter
+            transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),  # Apply Gaussian blur
+            transforms.ToTensor(),
+            transforms.GaussianNoise(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
+    else:
+        train_tfms = transforms.Compose([
+            transforms.Resize(size=(224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
+
+    return train_tfms
+
 valid_tfms = transforms.Compose([
     transforms.Resize(size=(224, 224)),
     transforms.ToTensor(),
@@ -96,7 +105,7 @@ def load_local_data(args):
     df = df.sample(64)
     df = df.reset_index(drop=True)
 
-    train_df, val_df = train_test_split(df, test_size=0.1)
+    train_df, val_df = train_test_split(df, test_size=args.test_size)
     train_df.reset_index(drop=True, inplace=True)
     val_df.reset_index(drop=True, inplace=True)
 
@@ -155,8 +164,8 @@ def load_coco_data(args):
     print(f'valid size: {len(val_df)}')
 
     return train_df, val_df
-def make_datasets(train_df, val_df):
-    train_ds = Dataset(train_df, train_tfms)
+def make_datasets(train_df, val_df, args):
+    train_ds = Dataset(train_df, create_train_tfms(args))
     val_ds = Dataset(val_df, valid_tfms)
     return train_ds, val_ds
 

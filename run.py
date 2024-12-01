@@ -46,6 +46,7 @@ def get_args():
     parser.add_argument("--unfreeze_all", type=int, default=5)
 
     parser.add_argument("--use_gpu", action='store_true')
+    parser.add_argument("--use_aug", action='store_true')
 
     parser.add_argument("--train", action='store_true')
 
@@ -59,7 +60,7 @@ def get_args():
     parser.add_argument("--mode", type=str, default="cross")
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--image_location", type=str, default="")
+    parser.add_argument("--model_location", type=str, default="")
     parser.add_argument("--model_name", type=str, default="captioner.pt")
     parser.add_argument("--sampling_method", type=str, default="multinomial")
     parser.add_argument("--temp", type=float, default=1.0)
@@ -185,14 +186,14 @@ if __name__ == "__main__":
     args = get_args()
     seed_everything(args.seed)
     trainer = setup(args)
-    file_path = trainer.train_config.model_path / f'{trainer.model_name}.txt'
+    results_file_path = trainer.train_config.model_path / f'{trainer.model_name}.txt'
 
     if args.train:
         result = trainer.fit()
         if not args.local_mode: # Use pre-trained weights locally because of mixed precision issues
             trainer.load_best_model()
 
-    with open(file_path, "w") as file:
+    with open(results_file_path, "w") as file:
         if not args.local_mode:
             file.write(trainer.table.to_df().dropna().to_string())
             trainer.table.close()

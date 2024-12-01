@@ -52,15 +52,18 @@ class Trainer:
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
-        if self.args.mode == 'cross':
-            self.model = VisionGPT2Model.from_pretrained(self.model_config, self.args).to(self.device)
+        if self.args.model_location != "":
+            self.load_saved_model()
         else:
-            self.model = GPT.from_pretrained(self.model_config, self.args).to(self.device)
+            if self.args.mode == 'cross':
+                self.model = VisionGPT2Model.from_pretrained(self.model_config, self.args).to(self.device)
+            else:
+                self.model = GPT.from_pretrained(self.model_config, self.args).to(self.device)
 
         self.model.pretrained_layers_trainable(trainable=False)
 
         self.train_df, self.valid_df = self.load_dataframes(args)
-        self.train_ds, self.valid_ds = make_datasets(self.train_df, self.valid_df)
+        self.train_ds, self.valid_ds = make_datasets(self.train_df, self.valid_df, args)
         self.train_dl = make_train_dataloader(self.train_ds, self.train_config)
         self.val_dl = make_validation_dataloader(self.valid_ds, self.train_config)
 
@@ -82,6 +85,17 @@ class Trainer:
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ])
+
+    def load_saved_model(self):
+        print(f'Loading saved model...{self.args.model_location}')
+
+        if self.args.mode == 'cross':
+            self.model = VisionGPT2Model(self.model_config, self.args)
+        else:
+            self.model = GPT(self.model_config, self.args)
+
+        sd = torch.load(self.train_config.model_path / self.args.model_location)
+        self.model.load_state_dict(sd)
 
     def load_dataframes(self, args):
         if args.local_mode:
@@ -111,7 +125,6 @@ class Trainer:
             torch.save(sd, self.train_config.model_path / self.model_name)
 
     def load_best_model(self):
-
         print(f'Loading best model...{self.model_name}')
         sd = torch.load(self.train_config.model_path / self.model_name)
         self.model.load_state_dict(sd)
@@ -184,7 +197,7 @@ class Trainer:
 
         return val_pxp
 
-
+    @torch.no_grad()
     def test_one_epoch(self):
         def compare_captions_just_bleu(test_img, test_caption, sampling_method, temp):
             gen_caption = self.generate_caption(

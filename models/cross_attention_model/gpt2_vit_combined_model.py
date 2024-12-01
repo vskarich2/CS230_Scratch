@@ -189,6 +189,8 @@ class VisionGPT2Model(nn.Module):
                 break
 
         return token_ids_generated_so_far.cpu().flatten()
+
+
     @staticmethod
     def from_pretrained(config, args):
 
