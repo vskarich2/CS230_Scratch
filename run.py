@@ -56,6 +56,8 @@ def get_args():
 
     parser.add_argument("--distance_word", action='store_true')
 
+    parser.add_argument("--infer_count", type=int, default=25)
+
     parser.add_argument("--is_linux", action='store_true')
     parser.add_argument("--mode", type=str, default="cross")
     parser.add_argument("--num_workers", type=int, default=4)
@@ -160,7 +162,7 @@ def compare_captions_just_bleu(test_img, test_caption, sampling_method, temp):
 
 def inference_test(trainer, file, args):
 
-    for i in range(100):
+    for i in range(args.infer_count):
         test = trainer.valid_df.sample(n=1).values[0]
         test_img, test_caption = test[0], test[1]
         compare_captions(
