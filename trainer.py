@@ -96,6 +96,7 @@ class Trainer:
 
         sd = torch.load(self.train_config.model_path / self.args.model_location)
         self.model.load_state_dict(sd)
+        self.model.to(self.device)
 
     def load_dataframes(self, args):
         if args.local_mode:
