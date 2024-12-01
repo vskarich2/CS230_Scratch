@@ -198,7 +198,7 @@ class Trainer:
 
         return val_pxp
 
-    @torch.no_grad()
+    
     def test_one_epoch(self):
         def compare_captions_just_bleu(test_img, test_caption, sampling_method, temp):
             gen_caption = self.generate_caption(

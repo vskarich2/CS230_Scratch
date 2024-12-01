@@ -197,6 +197,7 @@ class VisionGPT2Model(nn.Module):
         model = VisionGPT2Model(config, args)
         sd = model.state_dict()
 
+        # These layers are of course not present in the generic GPT2 model
         ignore_matches = ['blocks.', 'cross_attn.', 'ln_3', 'cls_token', 'pos_embed', 'patch_embed.', '.attn.mask']
 
         gpt2_small = GPT2LMHeadModel.from_pretrained('gpt2')
