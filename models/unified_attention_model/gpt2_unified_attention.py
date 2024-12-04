@@ -39,10 +39,10 @@ class GPT2UnifiedAttention(nn.Module):
 
         seq_len = self.seq_len  # Total sequence length (image tokens + text tokens)
 
-        # Create the full lower triangular mask for seq_len x seq_len
+        # Create the mask for seq_len x seq_len
         full_mask = torch.tril(torch.ones(seq_len, seq_len))
 
-        # Restrict image tokens (0:197) to only attend to image tokens (0:197)
+        # Image tokens (0:197) to only attend to image tokens (0:197)
         image_mask = full_mask[:NUM_IMAGE_TOKENS, :NUM_IMAGE_TOKENS]
 
         # Allow text tokens (197:seq_len) to attend to both image tokens and previous text tokens

@@ -53,6 +53,8 @@ class GPT(nn.Module):
             self.transformer.h[i].mlp
         ] for i in range(self.config.depth)]
 
+        self.blocks = self.gpt_layers # More sensibly named reference for unfreezing
+
         for l in self.gpt_layers:
             self.general_gpt_params.extend(l)
 
@@ -63,14 +65,27 @@ class GPT(nn.Module):
             self.image_encoder.vit_patch_embed
         ]
 
-    def unfreeze_gpt_layers(self):
+    def gpt_unfreezing_schedule(self, epoch):
+        layers = [x for x in range(11, -1, -1)]
+        if epoch % 2 == 0: # Check if even epoch
+            unfreeze_layers = layers[0:epoch + 2]
+        return unfreeze_layers
 
-        for layer in self.general_gpt_params:
-            if not isinstance(layer, nn.Parameter):
+    def unfreeze_gpt_layers(self, epoch):
+        blocks_to_unfreeze = self.gpt_unfreezing_schedule(epoch)
+
+        for block_num in blocks_to_unfreeze:
+            block = self.blocks[block_num]
+            for layer in block:
                 for p in layer.parameters():
                     p.requires_grad = True
-            else:
-                layer.requires_grad = True
+
+        # for layer in self.general_gpt_params:
+        #     if not isinstance(layer, nn.Parameter):
+        #         for p in layer.parameters():
+        #             p.requires_grad = True
+        #     else:
+        #         layer.requires_grad = True
 
     def pretrained_layers_trainable(self, trainable=False):
 

@@ -33,6 +33,8 @@ class VisionGPT2Model(nn.Module):
 
         self.cls_token = vit.cls_token
         self.pos_embed = vit.pos_embed
+
+        # No dropout for pos embedding for now
         self.pos_drop = nn.Dropout(p=0.)
 
         # Depth here is 12, and these are the ViT blocks in the vision model

@@ -198,7 +198,7 @@ class Trainer:
 
         return val_pxp
 
-    
+
     def test_one_epoch(self):
         def compare_captions_just_bleu(test_img, test_caption, sampling_method, temp):
             gen_caption = self.generate_caption(
@@ -221,8 +221,8 @@ class Trainer:
                 self.args.sampling_method,
                 self.args.temp,
             )
-
-            self.table["Test BLEU"] = bleu_score
+            if not self.args.local_mode:
+                self.table["Test BLEU"] = bleu_score
 
 
     def clean(self):
@@ -237,8 +237,7 @@ class Trainer:
             if not self.args.local_mode:
                 self.table["Epoch"] = f"{epoch + 1}/{self.train_config.epochs}"
 
-            if epoch == self.train_config.freeze_epochs_gpt:
-                self.model.unfreeze_gpt_layers()
+            self.model.unfreeze_gpt_layers(epoch)
 
             if epoch == self.train_config.freeze_epochs_all:
                 self.model.pretrained_layers_trainable(trainable=True)
