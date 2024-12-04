@@ -77,9 +77,9 @@ def create_train_tfms(args):
             transforms.Resize(size=(224, 224)),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),  # Random color jitter
-            transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),  # Apply Gaussian blur
+            #transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0)),  # Apply Gaussian blur
             transforms.ToTensor(),
-            transforms.GaussianNoise(),
+            #transforms.GaussianNoise(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
     else:
         train_tfms = transforms.Compose([

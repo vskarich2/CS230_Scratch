@@ -1,0 +1,17 @@
+name: cuda_env
+channels:
+  - defaults
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - pytorch
+  - pytorch-cuda=12.4
+  - torchvision
+  - numpy
+  - ablumentations
+  - scikit-learn
+  - pandas
+  - transformers
+  - matplotlib
+  - nltk

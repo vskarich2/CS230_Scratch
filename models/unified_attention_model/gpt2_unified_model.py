@@ -80,13 +80,6 @@ class GPT(nn.Module):
                 for p in layer.parameters():
                     p.requires_grad = True
 
-        # for layer in self.general_gpt_params:
-        #     if not isinstance(layer, nn.Parameter):
-        #         for p in layer.parameters():
-        #             p.requires_grad = True
-        #     else:
-        #         layer.requires_grad = True
-
     def pretrained_layers_trainable(self, trainable=False):
 
         all_params = []
