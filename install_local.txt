@@ -1,0 +1,9 @@
+conda create -n test_2 -y
+conda activate test_2
+conda install pytorch::pytorch torchvision -c pytorch -y
+conda install conda-forge::albumentations -y
+conda install transformers -y
+conda install scikit-learn -y
+conda install einops -y
+conda install matplotlib -y
+conda install timm -c conda-forge

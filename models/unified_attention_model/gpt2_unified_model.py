@@ -7,6 +7,8 @@ from models.image_encoder import ImageEncoder
 from models.unified_attention_model.gpt2_unified_transformer import GPT2UnifiedBlock
 import torch.nn.functional as F
 from einops import rearrange
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 warnings.filterwarnings("ignore")
 import torch.nn as nn
@@ -66,6 +68,7 @@ class GPT(nn.Module):
         ]
 
     def gpt_unfreezing_schedule(self, epoch):
+        unfreeze_layers = []
         layers = [x for x in range(11, -1, -1)]
         if epoch % 2 == 0: # Check if even epoch
             unfreeze_layers = layers[0:epoch + 2]
@@ -74,11 +77,16 @@ class GPT(nn.Module):
     def unfreeze_gpt_layers(self, epoch):
         blocks_to_unfreeze = self.gpt_unfreezing_schedule(epoch)
 
-        for block_num in blocks_to_unfreeze:
-            block = self.blocks[block_num]
-            for layer in block:
-                for p in layer.parameters():
-                    p.requires_grad = True
+        pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
+        pretty_blocks = pretty_blocks[::-1]
+        if len(pretty_blocks) > 0:
+            print(f'\nUnfreezing GPT layers: {pretty_blocks}')
+
+            for block_num in blocks_to_unfreeze:
+                block = self.blocks[block_num]
+                for layer in block:
+                    for p in layer.parameters():
+                        p.requires_grad = True
 
     def pretrained_layers_trainable(self, trainable=False):
 

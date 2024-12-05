@@ -1,13 +1,13 @@
-import json
 import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+from utils import *
 from datetime import datetime
 
 from matplotlib import pyplot as plt
-from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 from constants import LOCAL_MODEL_LOCATION, REMOTE_MODEL_LOCATION
 
-warnings.filterwarnings("ignore")
+
 
 from PIL import Image
 import argparse
@@ -39,15 +39,13 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--epochs", type=int, default=10)
+
     parser.add_argument("--sample", action='store_true')
-    parser.add_argument("--shortcut", action='store_true')
     parser.add_argument("--sample_size", type=int, default=1000)
 
-    parser.add_argument("--unfreeze_gpt", type=int, default=100)
-    parser.add_argument("--unfreeze_all", type=int, default=100)
-
-    parser.add_argument("--use_gpu", action='store_true')
     parser.add_argument("--use_aug", action='store_true')
+
+    parser.add_argument("--test_per_epoch", action='store_true')
 
     parser.add_argument("--train", action='store_true')
 
@@ -59,15 +57,19 @@ def get_args():
 
     parser.add_argument("--infer_count", type=int, default=25)
 
-    parser.add_argument("--is_linux", action='store_true')
     parser.add_argument("--mode", type=str, default="cross")
+
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=32)
+
     parser.add_argument("--model_location", type=str, default="")
     parser.add_argument("--model_name", type=str, default="captioner.pt")
+
     parser.add_argument("--sampling_method", type=str, default="multinomial")
-    parser.add_argument("--temp", type=float, default=1.0)
-    parser.add_argument("--bleu_count", type=int, default=100)
+    parser.add_argument("--temp", type=float, default=0.75)
+
+    parser.add_argument("--test_size", type=float, default=0.1)
+
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-4)
 
@@ -105,8 +107,6 @@ def setup(args):
 
     train_config = SimpleNamespace(
         epochs=args.epochs,
-        freeze_epochs_gpt=args.unfreeze_gpt,
-        freeze_epochs_all=args.unfreeze_all,
         lr=args.lr,
         device=get_device(args),
         model_path=Path(model_path),
@@ -140,25 +140,10 @@ def compare_captions(test_img, test_caption, sampling_method, temp, file):
         sampling_method=sampling_method
     )
 
-    smoothing_function = SmoothingFunction().method1
-    references = [test_caption.split()]
-    bleu_score = sentence_bleu(references, gen_caption.split(), smoothing_function=smoothing_function)
+    result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
 
-    result = f"BLEU: {bleu_score}\n img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
     file.write(result)
     print(result)
-
-def compare_captions_just_bleu(test_img, test_caption, sampling_method, temp):
-    gen_caption = trainer.generate_caption(
-        test_img,
-        temperature=temp,
-        sampling_method=sampling_method
-    )
-
-    smoothing_function = SmoothingFunction().method1
-    references = [test_caption.split()]
-    bleu_score = sentence_bleu(references, gen_caption.split(), smoothing_function=smoothing_function)
-    return bleu_score
 
 
 def inference_test(trainer, file, args):
@@ -173,17 +158,6 @@ def inference_test(trainer, file, args):
             args.temp,
             file
         )
-def bleu_score_inference_test(trainer, args):
-
-    for i in range(1000):
-        test = trainer.valid_df.sample(n=1).values[0]
-        test_img, test_caption = test[0], test[1]
-        compare_captions_just_bleu(
-            test_img,
-            test_caption,
-            args.sampling_method,
-            args.temp,
-        )
 
 
 if __name__ == "__main__":
@@ -195,12 +169,12 @@ if __name__ == "__main__":
     if args.train:
         result = trainer.fit()
         if not args.local_mode: # Use pre-trained weights locally because of mixed precision issues
-            trainer.load_best_model()
+            load_best_model(trainer)
 
     with open(results_file_path, "w") as file:
         if not args.local_mode:
-            file.write(trainer.table.to_df().dropna().to_string())
-            trainer.table.close()
+            file.write(trainer.metrics.dropna().to_string())
+
 
         inference_test(trainer, file, args)
         file.close()
