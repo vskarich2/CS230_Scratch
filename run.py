@@ -25,7 +25,7 @@ def get_args():
 
     parser.add_argument("--train", action='store_true')
 
-    parser.add_argument("--data", type=str, default="local")
+    parser.add_argument("--data", type=str, default="coco")
 
     parser.add_argument("--local_mode", action='store_true')
 
@@ -50,6 +50,7 @@ def get_args():
                         default=1e-4)
 
     parser.add_argument("--dry_run", action='store_true')
+    parser.add_argument("--log_wandb", action='store_true')
 
     args = parser.parse_args()
 
@@ -82,7 +83,9 @@ def setup(args):
         model_path=Path(model_path),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        model_name=create_model_name(args)
+        model_name=create_model_name(args),
+        train_size=None,
+        valid_size=None
     )
 
     o = SimpleNamespace(

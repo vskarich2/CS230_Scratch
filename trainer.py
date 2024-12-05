@@ -1,10 +1,10 @@
 import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from models.cross_attention_model.gpt2_vit_combined_model import VisionGPT2Model
 from models.unified_attention_model.gpt2_unified_model import GPT
 
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
+import wandb
 from tqdm import tqdm
 
 from project_datasets import captioning_dataset as ds
@@ -18,6 +18,7 @@ from utils import *
 
 class Trainer:
     def __init__(self, o):
+        self.o = o
         self.args = o.args
         self.model_name = o.train_config.model_name
         self.train_config = o.train_config
@@ -56,6 +57,22 @@ class Trainer:
             steps_per_epoch=total_steps
         )
 
+        if 'log_wandb' in o.args:
+            wandb.init(
+                # set the wandb project where this run will be logged
+                project="CS230_final_project",
+
+                # track hyperparameters and run metadata
+                config={
+                    "learning_rate": 1e-4,
+                    "architecture": o.args.mode,
+                    "dataset": o.args.data,
+                    "epochs": o.train_config.epochs,
+                    "train_size": o.train_config.train_size,
+                    "valid_size": o.train_config.valid_size
+                }
+            )
+
     def fit(self):
 
         best_valid = 1e9
@@ -84,6 +101,9 @@ class Trainer:
 
         return
 
+    def log(self, name, value):
+        if 'log_wandb' in self.o.args:
+            wandb.log({name: value})
 
     def train_one_epoch(self, epoch):
 
@@ -108,13 +128,20 @@ class Trainer:
 
                 running_loss += loss.item()
                 lr = self.sched.get_last_lr()
+
+                self.log('lr', "{0:.6g}".format(lr[0]))
+
                 prog.set_description(f'train loss: {loss.item():.3f}')
                 prog.set_postfix({'lr': "{0:.6g}".format(lr[0])})
 
 
             del image, input_ids, labels, loss
+
         train_loss = running_loss / len(self.train_dl)
         self.metrics.loc[epoch, ['train_loss']] = train_loss
+
+        self.log('train_loss', train_loss)
+
 
     @torch.no_grad()
     def valid_one_epoch(self, epoch):
@@ -136,6 +163,8 @@ class Trainer:
 
         val_loss = running_loss / len(self.valid_dl)
         self.metrics.loc[epoch, ['val_loss']] = val_loss
+
+        self.log('valid_loss', val_loss)
 
         return val_loss
 
