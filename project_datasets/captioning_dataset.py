@@ -1,7 +1,7 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-from constants import REMOTE_COCO_DATA_LOCATION, REMOTE_DISTANCE_DATA_LOCATION, LOCAL_DISTANCE_DATA_LOCATION
+from constants import *
 
 import json
 from pathlib import Path
@@ -19,7 +19,9 @@ from albumentations.pytorch import ToTensorV2
 tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
 tokenizer.pad_token = tokenizer.eos_token
 tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
-class Dataset:
+
+
+class CaptioningDataset:
     def __init__(self, df, tfms):
         self.df = df
         self.tfms = tfms
@@ -50,7 +52,6 @@ class Dataset:
 
         return image, input_ids, labels
 
-
 def collate_fn(batch):
     image = [i[0] for i in batch]
     input_ids = [i[1] for i in batch]
@@ -76,31 +77,66 @@ def collate_fn(batch):
     labels[mask == 0] = -100 # This is done to exclude the padding tokens from the loss function
     return image, input_ids, labels
 
-preprocess_tfms = A.Compose([
-    A.Resize(224,224),
-    A.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225],always_apply=True),
+no_aug_tfms = A.Compose([
+    A.Resize(IMAGE_SIZE,IMAGE_SIZE),
+    A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_SD, always_apply=True),
     ToTensorV2()
 ])
 
-costly_tfms = [
-        A.HorizontalFlip(),
-        A.RandomBrightnessContrast(),
-        A.ColorJitter(),
-        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.3, rotate_limit=45, p=0.5),
-        A.HueSaturationValue(p=0.3),
-        ]
+aug_tfms = A.Compose([
+    A.Resize(IMAGE_SIZE,IMAGE_SIZE),
+    A.HorizontalFlip(),
+    A.RandomBrightnessContrast(),
+    A.ColorJitter(),
+    A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.3, rotate_limit=45, p=0.5),
+    A.HueSaturationValue(p=0.3),
+    A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_SD, always_apply=True),
+    ToTensorV2()
+])
+def sample_dataframes(train_df, valid_df, o):
+    if o.args.sample_frac != 1.0:
+        sample_frac = o.args.sample_frac
+        t_df = train_df.sample(int(train_df.shape[0] * sample_frac))
+        v_df = valid_df.sample(int(valid_df.shape[0] * sample_frac))
+        return t_df, v_df
+    elif 'sample_size' in vars(o.args):
+        t_df = train_df.sample(o.args.sample_size)
+        v_df = valid_df.sample(int(o.args.sample_size * 0.1))
+        return t_df, v_df
+    else:
+        return train_df, valid_df
+
 def create_train_tfms(args):
     if args.use_aug:
-        print("\nUsing augmented images....")
-        train_tfms = A.Compose([*costly_tfms, preprocess_tfms])
+        train_tfms = aug_tfms
     else:
-        train_tfms = A.Compose([preprocess_tfms])
+        train_tfms = no_aug_tfms
 
     return train_tfms
 
+def create_dataloaders(o):
+    train_df, valid_df = load_dataframes(o)
+    train_ds, valid_ds = load_datasets(train_df, valid_df, o.args)
 
-def load_local_data(args):
-    base_path = Path('/Users/vskarich/CS230_Scratch_Large/local_data/images/Flicker8k_Dataset')
+    train_dl = make_train_dataloader(train_ds, o)
+    val_dl = make_validation_dataloader(valid_ds, o)
+
+    return train_dl, val_dl
+
+
+def load_dataframes(o):
+    if o.args.local_mode:
+        return load_local_data(o)
+    else:
+        if o.args.data == 'distance':
+            df_t, df_v = load_distance_data(o)
+            return sample_dataframes(df_t, df_v, o)
+        else:
+            df_t, df_v = load_coco_data(o)
+            return sample_dataframes(df_t, df_v, o)
+
+def load_local_data(o):
+    base_path = Path(LOCAL_TEST_DATA_BASE_FOLDER)
     df = pd.read_csv('/Users/vskarich/CS230_Scratch_Large/local_data/captions/captions.csv', delimiter=',')
     df.dropna(axis=0, how='any', inplace=True)
     df['image'] = df['image'].map(lambda x:base_path / x.strip())
@@ -109,30 +145,25 @@ def load_local_data(args):
     df = df.sample(64)
     df = df.reset_index(drop=True)
 
-    train_df, val_df = train_test_split(df, test_size=args.test_size)
+    train_df, val_df = train_test_split(df, test_size=o.args.test_size)
     train_df.reset_index(drop=True, inplace=True)
     val_df.reset_index(drop=True, inplace=True)
 
     return train_df, val_df
 
-def load_distance_data(args):
+def load_distance_data(o):
     base_path = Path()
-    if args.local_mode:
+    if o.args.local_mode:
         base_path = Path(LOCAL_DISTANCE_DATA_LOCATION)
     else:
         base_path = Path(REMOTE_DISTANCE_DATA_LOCATION)
 
 
     df = pd.read_csv(base_path / 'processed_captions.csv', index_col=0)
-
     df.dropna(axis=0, how='any', inplace=True)
-
     df['image'] = df['img_url'].map(lambda x: base_path / 'images' / x.strip())
-
-    caption_col = 'caption_str_2' if args.distance_word else 'caption_str_1'
-
+    caption_col = 'caption_str_2' if o.args.distance_word else 'caption_str_1'
     df['caption'] = df[caption_col].map(lambda x: x.strip().lower())
-
     df = df[['image', 'caption']]
 
     train_df, val_df = train_test_split(df, test_size=0.1)
@@ -141,7 +172,7 @@ def load_distance_data(args):
 
     return train_df, val_df
 
-def load_coco_data(args):
+def load_coco_data(o):
     base_path = Path(REMOTE_COCO_DATA_LOCATION)
     annot = base_path / 'annotations' / 'captions_train2017.json'
     with open(annot, 'r') as f:
@@ -164,33 +195,33 @@ def load_coco_data(args):
     train_df, val_df = train_test_split(df, test_size=0.05)
     train_df.reset_index(drop=True, inplace=True)
     val_df.reset_index(drop=True, inplace=True)
-    print(f'train size: {len(train_df)}')
-    print(f'valid size: {len(val_df)}')
 
     return train_df, val_df
-def make_datasets(train_df, val_df, args):
-    train_ds = Dataset(train_df, create_train_tfms(args))
-    val_ds = Dataset(val_df, preprocess_tfms)
+
+def load_datasets(train_df, val_df, args):
+    train_ds = CaptioningDataset(train_df, create_train_tfms(args))
+    val_ds = CaptioningDataset(val_df, no_aug_tfms)
+
     return train_ds, val_ds
 
-def make_train_dataloader(ds, train_config):
+def make_train_dataloader(ds, o):
     train_dl = DataLoader(
         ds,
-        batch_size=train_config.batch_size,
+        batch_size=o.train_config.batch_size,
         shuffle=True,
         pin_memory=True,
-        num_workers=train_config.num_workers,
+        num_workers=o.train_config.num_workers,
         persistent_workers=True,
         collate_fn=collate_fn
     )
     return train_dl
-def make_validation_dataloader(ds, train_config):
+def make_validation_dataloader(ds, o):
     val_dl = DataLoader(
         ds,
-        batch_size=train_config.batch_size,
+        batch_size=o.train_config.batch_size,
         shuffle=False,
         pin_memory=True,
-        num_workers=train_config.num_workers,
+        num_workers=o.train_config.num_workers,
         persistent_workers=True,
         collate_fn=collate_fn
     )

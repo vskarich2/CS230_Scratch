@@ -1,47 +1,23 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
-from utils import *
-from datetime import datetime
 
-from matplotlib import pyplot as plt
+from utils import *
 
 from constants import LOCAL_MODEL_LOCATION, REMOTE_MODEL_LOCATION
 
-
-
-from PIL import Image
 import argparse
-import random
 from pathlib import Path
 from types import SimpleNamespace
-import numpy as np
-import torch
 
 from trainer import Trainer
-
-def get_device(args):
-    if torch.cuda.is_available():
-        device = "cuda"
-    elif torch.backends.mps.is_available() and args.train:
-        device = "mps"
-    else:
-        device = "cpu"
-    print(f"Using device: {device}")
-    return device
-
-def create_model_name(args):
-    model_timestamp = datetime.now().strftime("%b-%d-%H:%M")
-    model_details = f'mode={args.mode},epochs={args.epochs},lr={args.lr}'
-    model_name = f'{model_timestamp}_{model_details}_{args.model_name}'
-    return model_name
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--epochs", type=int, default=10)
 
-    parser.add_argument("--sample", action='store_true')
-    parser.add_argument("--sample_size", type=int, default=1000)
+    parser.add_argument("--sample_frac", type=float, default=1.0)
+    parser.add_argument("--sample_size", type=int)
 
     parser.add_argument("--use_aug", action='store_true')
 
@@ -73,17 +49,11 @@ def get_args():
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-4)
 
+    parser.add_argument("--dry_run", action='store_true')
+
     args = parser.parse_args()
 
     return args
-def seed_everything(seed=11711):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
 
 def setup(args):
 
@@ -115,49 +85,19 @@ def setup(args):
         model_name=create_model_name(args)
     )
 
-    trainer = Trainer(model_config, train_config, args)
+    o = SimpleNamespace(
+        train_config=train_config,
+        model_config = model_config,
+        args=args
+    )
+
+
+    trainer = Trainer(o)
 
     return trainer
 
 
-def show_image(test_img, test_caption, sampling_method, temp):
 
-    plt.imshow(Image.open(test_img).convert('RGB'))
-    gen_caption = trainer.generate_caption(
-        test_img,
-        temperature=temp,
-        sampling_method=sampling_method
-    )
-
-    plt.title(f"actual: {test_caption}\nmodel: {gen_caption}\ntemp: {temp} sampling_method: {sampling_method}")
-    plt.axis('off')
-    plt.show()
-
-def compare_captions(test_img, test_caption, sampling_method, temp, file):
-    gen_caption = trainer.generate_caption(
-        test_img,
-        temperature=temp,
-        sampling_method=sampling_method
-    )
-
-    result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
-
-    file.write(result)
-    print(result)
-
-
-def inference_test(trainer, file, args):
-
-    for i in range(args.infer_count):
-        test = trainer.valid_df.sample(n=1).values[0]
-        test_img, test_caption = test[0], test[1]
-        compare_captions(
-            test_img,
-            test_caption,
-            args.sampling_method,
-            args.temp,
-            file
-        )
 
 
 if __name__ == "__main__":
@@ -174,7 +114,6 @@ if __name__ == "__main__":
     with open(results_file_path, "w") as file:
         if not args.local_mode:
             file.write(trainer.metrics.dropna().to_string())
-
 
         inference_test(trainer, file, args)
         file.close()

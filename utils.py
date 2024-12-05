@@ -1,16 +1,12 @@
+from datetime import datetime
+
 import torch
+from PIL.Image import Image
+from matplotlib import pyplot as plt
 
 from constants import LOCAL_MODEL_LOCATION
-from models.cross_attention_model.gpt2_vit_combined_model import VisionGPT2Model
-from models.unified_attention_model.gpt2_unified_model import GPT
-from project_datasets import load_local_data, load_distance_data, load_coco_data
-
-
-def save_model(trainer):
-    if not trainer.args.local_mode:
-        trainer.train_config.model_path.mkdir(exist_ok=True)
-        sd = trainer.model.state_dict()
-        torch.save(sd, trainer.train_config.model_path / trainer.model_name)
+import numpy as np
+import random
 
 def load_best_model(trainer):
     print(f'Loading best model...{trainer.model_name}')
@@ -25,33 +21,65 @@ def load_local_model(trainer):
     )
     trainer.model.load_state_dict(sd)
 
-def load_saved_model(trainer):
-    args = trainer.args
-    model = trainer.model
-    print(f'Loading saved model...{args.model_location}')
 
-    if args.mode == 'cross':
-        model = VisionGPT2Model(trainer.model_config, args)
+def create_model_name(args):
+    model_timestamp = datetime.now().strftime("%b-%d-%H:%M")
+    model_details = f'mode={args.mode},epochs={args.epochs},lr={args.lr}'
+    model_name = f'{model_timestamp}_{model_details}_{args.model_name}'
+    return model_name
+def seed_everything(seed=11711):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
+def get_device(args):
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available() and args.train:
+        device = "mps"
     else:
-        model = GPT(trainer.model_config, args)
+        device = "cpu"
+    print(f"Using device: {device}")
+    return device
 
-    sd = torch.load(trainer.train_config.model_path / args.model_location)
-    model.load_state_dict(sd)
-    model.to(trainer.device)
+def show_image(trainer, test_img, test_caption, sampling_method, temp):
 
-def load_dataframes(trainer):
-    args = trainer.args
-    if args.local_mode:
-        if args.data == 'local':
-            train_df, valid_df = load_local_data(args)
-        elif args.data == 'distance':
-            train_df, valid_df = load_distance_data(args)
-    else:
-        if args.data == 'distance':
-            train_df, valid_df = load_distance_data(args)
-        else:
-            train_df, valid_df = load_coco_data(args)
-            if args.sample:
-                train_df = train_df.sample(args.sample_size)
-                valid_df = valid_df.sample(int(args.sample_size * 0.1))
-    return train_df, valid_df
+    plt.imshow(Image.open(test_img).convert('RGB'))
+    gen_caption = trainer.generate_caption(
+        test_img,
+        temperature=temp,
+        sampling_method=sampling_method
+    )
+
+    plt.title(f"actual: {test_caption}\nmodel: {gen_caption}\ntemp: {temp} sampling_method: {sampling_method}")
+    plt.axis('off')
+    plt.show()
+
+def compare_captions(trainer, test_img, test_caption, sampling_method, temp, file):
+    gen_caption = trainer.generate_caption(
+        test_img,
+        temperature=temp,
+        sampling_method=sampling_method
+    )
+
+    result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
+
+    file.write(result)
+    print(result)
+
+def inference_test(trainer, file, args):
+
+    for i in range(args.infer_count):
+        test = trainer.valid_df.sample(n=1).values[0]
+        test_img, test_caption = test[0], test[1]
+        compare_captions(
+            test_img,
+            test_caption,
+            args.sampling_method,
+            args.temp,
+            file
+        )

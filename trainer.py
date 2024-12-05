@@ -1,11 +1,13 @@
 import warnings
+
+from models.cross_attention_model.gpt2_vit_combined_model import VisionGPT2Model
+from models.unified_attention_model.gpt2_unified_model import GPT
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from tqdm import tqdm
 
-from project_datasets import make_train_dataloader, make_validation_dataloader, make_datasets, preprocess_tfms
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+from project_datasets import captioning_dataset as ds
 import pandas as pd
 import gc
 from PIL import Image
@@ -15,12 +17,11 @@ from transformers import GPT2TokenizerFast
 from utils import *
 
 class Trainer:
-    def __init__(self, model_config, train_config, args):
-        self.args = args
-
-        self.model_name = train_config.model_name
-        self.train_config = train_config
-        self.model_config = model_config
+    def __init__(self, o):
+        self.args = o.args
+        self.model_name = o.train_config.model_name
+        self.train_config = o.train_config
+        self.model_config = o.model_config
 
         self.metrics = pd.DataFrame()
         self.metrics[['train_loss', 'val_loss']] = None
@@ -31,7 +32,7 @@ class Trainer:
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
         if self.args.model_location != "":
-            load_saved_model(self)
+            self.load_saved_model()
         else:
             if self.args.mode == 'cross':
                 self.model = VisionGPT2Model.from_pretrained(self.model_config, self.args).to(self.device)
@@ -40,10 +41,9 @@ class Trainer:
 
         self.model.pretrained_layers_trainable(trainable=False)
 
-        self.train_df, self.valid_df = load_dataframes(self)
-        self.train_ds, self.valid_ds = make_datasets(self.train_df, self.valid_df, args)
-        self.train_dl = make_train_dataloader(self.train_ds, self.train_config)
-        self.val_dl = make_validation_dataloader(self.valid_ds, self.train_config)
+        self.train_dl, self.val_dl = ds.create_dataloaders(o)
+        print(f'train size: {len(self.train_dl)}')
+        print(f'valid size: {len(self.val_dl)}')
 
         # This is necessary because of lower-cost mixed-precision training
         self.scaler = GradScaler()
@@ -57,6 +57,35 @@ class Trainer:
             epochs=self.train_config.epochs,
             steps_per_epoch=total_steps
         )
+
+    def fit(self):
+
+        best_valid = 1e9
+        prog = tqdm(range(self.train_config.epochs))
+        for epoch in prog:
+
+            self.model.unfreeze_gpt_layers(epoch)
+
+            # Put model in training mode
+            self.model.train()
+            prog.set_description('training')
+            self.train_one_epoch(epoch)
+            self.clean()
+
+            # Put model in eval mode
+            self.model.eval()
+            prog.set_description('validating')
+            valid = self.valid_one_epoch(epoch)
+            self.clean()
+
+            if valid < best_valid:
+                best_valid = valid
+                self.save_model()
+
+            print(self.metrics.tail(1))
+
+        return
+
 
     def train_one_epoch(self, epoch):
 
@@ -110,9 +139,7 @@ class Trainer:
         val_loss = running_loss / len(self.val_dl)
         self.metrics.loc[epoch, ['val_loss']] = val_loss
 
-        with autocast():
-            if self.args.test_per_epoch:
-                self.test_one_epoch()
+        return val_loss
 
 
 
@@ -125,27 +152,25 @@ class Trainer:
         gc.collect()
         torch.cuda.empty_cache()
 
-    def fit(self):
-        prog = tqdm(range(self.train_config.epochs))
-        for epoch in prog:
+    def save_model(self):
+        if not self.args.local_mode:
+            self.train_config.model_path.mkdir(exist_ok=True)
+            sd = self.model.state_dict()
+            torch.save(sd, self.train_config.model_path / self.model_name)
 
-            self.model.unfreeze_gpt_layers(epoch)
+    def load_saved_model(self):
+        args = self.args
 
-            # Put model in training mode, as opposed to eval mode
-            self.model.train()
+        print(f'Loading saved model...{args.model_location}')
 
-            self.train_one_epoch(epoch)
-            self.clean()
+        if args.mode == 'cross':
+            self.model = VisionGPT2Model(self.model_config, args)
+        else:
+            self.model = GPT(self.model_config, args)
 
-            # Put model in eval mode, as opposed to training mode
-            self.model.eval()
-            prog.set_description('validating')
-            self.valid_one_epoch(epoch)
-            self.clean()
-
-            print(self.metrics.tail(1))
-
-        return
+        sd = torch.load(self.train_config.model_path / args.model_location)
+        self.model.load_state_dict(sd)
+        self.model.to(self.device)
 
     @torch.no_grad()
     def generate_caption(self, image, max_tokens=50, temperature=1.0, sampling_method='multinomial'):
@@ -153,7 +178,7 @@ class Trainer:
 
         image = Image.open(image).convert('RGB')
         image = np.array(image)
-        image = preprocess_tfms(image=image)['image']
+        image = self.dataset.no_aug_tfms(image=image)['image']
         image = image.unsqueeze(0).to(self.device)
         sequence = torch.ones(1, 1).to(device=self.device).long() * self.tokenizer.bos_token_id
 
