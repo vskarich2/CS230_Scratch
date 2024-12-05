@@ -42,8 +42,6 @@ class Trainer:
         self.model.pretrained_layers_trainable(trainable=False)
 
         self.train_dl, self.valid_dl = ds.create_dataloaders(o)
-        print(f'train size: {len(self.train_dl)}')
-        print(f'valid size: {len(self.valid_dl)}')
 
         # This is necessary because of lower-cost mixed-precision training
         self.scaler = GradScaler()
@@ -142,11 +140,10 @@ class Trainer:
         return val_loss
 
 
-
-    def test_one_epoch(self):
-        for i in range(self.args.bleu_count):
-            test = self.valid_df.sample(n=1).values[0]
-            test_img, test_caption = test[0], test[1]
+    # def test_one_epoch():
+    #     for i in range(self.args.bleu_count):
+    #         test = self.valid_df.sample(n=1).values[0]
+    #         test_img, test_caption = test[0], test[1]
 
     def clean(self):
         gc.collect()

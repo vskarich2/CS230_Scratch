@@ -98,13 +98,19 @@ def sample_dataframes(train_df, valid_df, o):
         sample_frac = o.args.sample_frac
         t_df = train_df.sample(int(train_df.shape[0] * sample_frac))
         v_df = valid_df.sample(int(valid_df.shape[0] * sample_frac))
-        return t_df, v_df
+
     elif 'sample_size' in vars(o.args):
         t_df = train_df.sample(o.args.sample_size)
         v_df = valid_df.sample(int(o.args.sample_size * 0.1))
-        return t_df, v_df
+
     else:
-        return train_df, valid_df
+        t_df = train_df
+        v_df = valid_df
+
+    print(f'train size: {t_df.shape[0]}')
+    print(f'valid size: {t_df.shape[0]}')
+
+    return t_df, v_df
 
 def create_train_tfms(args):
     if args.use_aug:
