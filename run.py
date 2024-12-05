@@ -114,12 +114,12 @@ if __name__ == "__main__":
         if not args.local_mode: # Use pre-trained weights locally because of mixed precision issues
             load_best_model(trainer)
 
-    with open(results_file_path, "w") as file:
-        if not args.local_mode:
-            file.write(trainer.metrics.dropna().to_string())
-
-        inference_test(trainer, file, args)
-        file.close()
+    # with open(results_file_path, "w") as file:
+    #     if not args.local_mode:
+    #         file.write(trainer.metrics.dropna().to_string())
+    #
+    #     inference_test(trainer, file, args)
+    #     file.close()
 
 
 
