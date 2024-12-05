@@ -51,6 +51,32 @@ class VisionGPT2Model(nn.Module):
         self.lm_head = nn.Linear(config.embed_dim, config.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight
 
+    def gpt_unfreezing_schedule(self, epoch):
+        unfreeze_layers = []
+        layers = [x for x in range(11, -1, -1)]
+        if epoch % 2 == 0: # Check if even epoch
+            unfreeze_layers = layers[0:epoch + 2]
+        return unfreeze_layers
+
+    # First train cross attention 2 epochs with learning rate around 1e-3
+
+    # Second Unfreeze GPT2 layers on epoch 3 lr=1e-5 1 layer per epoch
+
+    # Third Unfreeze Encoder layers on epoch 6 lr=1e-5 1 layer per epoch
+    def unfreeze_layers(self, epoch):
+        blocks_to_unfreeze = self.gpt_unfreezing_schedule(epoch)
+
+        pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
+        pretty_blocks = pretty_blocks[::-1]
+        if len(pretty_blocks) > 0:
+            print(f'\nUnfreezing GPT layers: {pretty_blocks}')
+
+            for block_num in blocks_to_unfreeze:
+                block = self.blocks[block_num]
+                for layer in block:
+                    for p in layer.parameters():
+                        p.requires_grad = True
+
     def vit_pos_embed(self, x):
         pos_embed = self.pos_embed
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)

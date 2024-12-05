@@ -96,18 +96,14 @@ aug_tfms = A.Compose([
     ToTensorV2()
 ])
 def sample_dataframes(train_df, valid_df, o):
-    if o.args.sample_frac != 1.0:
-        sample_frac = o.args.sample_frac
-        t_df = train_df.sample(int(train_df.shape[0] * sample_frac))
-        v_df = valid_df.sample(int(valid_df.shape[0] * sample_frac))
-
-    elif 'sample_size' in vars(o.args):
+    if 'sample_size' in vars(o.args):
         t_df = train_df.sample(o.args.sample_size)
         v_df = valid_df.sample(int(o.args.sample_size * 0.1))
+    else :
+        sample_frac = o.args.sample_frac
 
-    else:
-        t_df = train_df
-        v_df = valid_df
+        t_df = train_df.sample(int(train_df.shape[0] * sample_frac))
+        v_df = valid_df.sample(int(valid_df.shape[0] * sample_frac))
 
     o.train_config.train_size = t_df.shape[0]
     o.train_config.valid_size = v_df.shape[0]
