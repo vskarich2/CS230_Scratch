@@ -57,7 +57,7 @@ class Trainer:
             steps_per_epoch=total_steps
         )
 
-        if 'log_wandb' in o.args:
+        if o.args.log_wandb is not None:
             wandb.init(
                 # set the wandb project where this run will be logged
                 project="CS230_final_project",
@@ -79,7 +79,7 @@ class Trainer:
         prog = tqdm(range(self.train_config.epochs))
         for epoch in prog:
 
-            self.model.unfreeze_gpt_layers(epoch)
+            self.model.unfreeze_layers(epoch)
 
             # Put model in training mode
             self.model.train()
@@ -102,7 +102,7 @@ class Trainer:
         return
 
     def log(self, name, value):
-        if self.o.args.use_wandb is not None:
+        if self.o.args.log_wandb is not None:
             wandb.log({name: value})
 
     def train_one_epoch(self, epoch):
