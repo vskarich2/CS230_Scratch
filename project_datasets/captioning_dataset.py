@@ -109,7 +109,7 @@ def sample_dataframes(train_df, valid_df, o):
     o.train_config.valid_size = v_df.shape[0]
 
     print(f'train size: {t_df.shape[0]}')
-    print(f'valid size: {t_df.shape[0]}')
+    print(f'valid size: {v_df.shape[0]}')
 
     return t_df, v_df
 

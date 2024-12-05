@@ -57,7 +57,7 @@ class Trainer:
             steps_per_epoch=total_steps
         )
 
-        if o.args.log_wandb is not None:
+        if o.args.log_wandb:
             wandb.init(
                 # set the wandb project where this run will be logged
                 project="CS230_final_project",
@@ -102,7 +102,7 @@ class Trainer:
         return
 
     def log(self, name, value):
-        if self.o.args.log_wandb is not None:
+        if self.o.args.log_wandb:
             wandb.log({name: value})
 
     def train_one_epoch(self, epoch):
