@@ -74,7 +74,7 @@ def compare_captions(trainer, test_img, test_caption, sampling_method, temp, fil
 def inference_test(trainer, file, args):
 
     for i in range(args.infer_count):
-        test = trainer.valid_df.sample(n=1).values[0]
+        test = trainer.df_v.sample(n=1).values[0]
         test_img, test_caption = test[0], test[1]
         compare_captions(
             test_img,

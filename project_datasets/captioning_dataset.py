@@ -52,6 +52,8 @@ class CaptioningDataset:
 
         return image, input_ids, labels
 
+
+
 def collate_fn(batch):
     image = [i[0] for i in batch]
     input_ids = [i[1] for i in batch]
@@ -123,14 +125,14 @@ def create_train_tfms(args):
 
     return train_tfms
 
-def create_dataloaders(o):
+def create_data(o):
     train_df, valid_df = load_dataframes(o)
     train_ds, valid_ds = load_datasets(train_df, valid_df, o.args)
 
     train_dl = make_train_dataloader(train_ds, o)
     val_dl = make_validation_dataloader(valid_ds, o)
 
-    return train_dl, val_dl
+    return train_dl, val_dl, valid_df
 
 
 def load_dataframes(o):

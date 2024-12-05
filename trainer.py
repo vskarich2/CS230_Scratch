@@ -42,7 +42,7 @@ class Trainer:
 
         self.model.pretrained_layers_trainable(trainable=False)
 
-        self.train_dl, self.valid_dl = ds.create_dataloaders(o)
+        self.train_dl, self.valid_dl, self.df_v = ds.create_data(o)
 
         # This is necessary because of lower-cost mixed-precision training
         self.scaler = GradScaler()
@@ -129,7 +129,7 @@ class Trainer:
                 running_loss += loss.item()
                 lr = self.sched.get_last_lr()
 
-                self.log('lr', "{0:.6g}".format(lr[0]))
+                self.log('lr', lr[0])
 
                 prog.set_description(f'train loss: {loss.item():.3f}')
                 prog.set_postfix({'lr': "{0:.6g}".format(lr[0])})
