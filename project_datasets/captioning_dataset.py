@@ -96,7 +96,7 @@ aug_tfms = A.Compose([
     ToTensorV2()
 ])
 def sample_dataframes(train_df, valid_df, o):
-    if 'sample_size' in vars(o.args):
+    if o.args.sample_size is not None:
         t_df = train_df.sample(o.args.sample_size)
         v_df = valid_df.sample(int(o.args.sample_size * 0.1))
     else :

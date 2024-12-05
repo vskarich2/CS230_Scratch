@@ -102,7 +102,7 @@ class Trainer:
         return
 
     def log(self, name, value):
-        if 'log_wandb' in self.o.args:
+        if self.o.args.use_wandb is not None:
             wandb.log({name: value})
 
     def train_one_epoch(self, epoch):
