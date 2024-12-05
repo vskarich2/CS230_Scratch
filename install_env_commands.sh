@@ -1,4 +1,5 @@
-conda env create --my_env -y
+conda create -n test_2 -y
+conda activate test_2
 conda install conda-forge::albumentations -y
 conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia -y
 conda install numpy -y
