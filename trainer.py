@@ -41,9 +41,9 @@ class Trainer:
 
         self.model.pretrained_layers_trainable(trainable=False)
 
-        self.train_dl, self.val_dl = ds.create_dataloaders(o)
+        self.train_dl, self.valid_dl = ds.create_dataloaders(o)
         print(f'train size: {len(self.train_dl)}')
-        print(f'valid size: {len(self.val_dl)}')
+        print(f'valid size: {len(self.valid_dl)}')
 
         # This is necessary because of lower-cost mixed-precision training
         self.scaler = GradScaler()
@@ -122,7 +122,7 @@ class Trainer:
     def valid_one_epoch(self, epoch):
 
         running_loss = 0.
-        prog = tqdm(self.val_dl, total=len(self.val_dl))
+        prog = tqdm(self.valid_dl, total=len(self.valid_dl))
         for image, input_ids, labels in prog:
             # This is necessary because of lower-cost mixed-precision training
             with autocast():
@@ -136,7 +136,7 @@ class Trainer:
 
             del image, input_ids, labels, loss
 
-        val_loss = running_loss / len(self.val_dl)
+        val_loss = running_loss / len(self.valid_dl)
         self.metrics.loc[epoch, ['val_loss']] = val_loss
 
         return val_loss
