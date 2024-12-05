@@ -74,7 +74,13 @@ class GPT(nn.Module):
             unfreeze_layers = layers[0:epoch + 2]
         return unfreeze_layers
 
+    def unfreeze_general_params(self):
+        for param in self.general_gpt_params:
+            param.requires_grad = True
+
     def unfreeze_layers(self, epoch):
+        self.unfreeze_general_params()
+
         blocks_to_unfreeze = self.gpt_unfreezing_schedule(epoch)
 
         pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
