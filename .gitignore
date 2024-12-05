@@ -3,6 +3,7 @@ ENV/
 
 *.pyc
 
+wandb/
 # Spyder project settings
 .spyderproject
 
