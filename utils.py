@@ -65,8 +65,9 @@ def compare_captions(trainer, test_img, test_caption, sampling_method, temp, fil
         temperature=temp,
         sampling_method=sampling_method
     )
-
-    result = f"img: {test_img.name} \nactual: {test_caption}\nmodel: {gen_caption}\n"
+    result = {}
+    result["image_id"] = 1
+    result["caption"] = gen_caption
 
     file.write(result)
     print(result)

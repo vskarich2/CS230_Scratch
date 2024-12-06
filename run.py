@@ -173,11 +173,17 @@ if __name__ == "__main__":
     results_file_path = trainer.train_config.model_path / f'{trainer.model_name}.txt'
 
     #calculate_coco_scores(trainer.o)
+    # with open(results_file_path, "w") as file:
+    #     inference_test(trainer, args, file)
 
     if args.train:
         result = trainer.fit()
-        if not args.local_mode: # Use pre-trained weights locally because of mixed precision issues
-            load_best_model(trainer)
+        # if not args.local_mode: # Use pre-trained weights locally because of mixed precision issues
+        #     load_best_model(trainer)
+        #     with open(results_file_path, "w") as file:
+        #         inference_test(trainer, file, args)
+
+
 
     # with open(results_file_path, "w") as file:
     #     if not args.local_mode:
