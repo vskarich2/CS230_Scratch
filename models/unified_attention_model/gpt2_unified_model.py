@@ -60,6 +60,10 @@ class GPT(nn.Module):
         for l in self.gpt_layers:
             self.general_gpt_params.extend(l)
 
+        '''It is important to surface these here so that they are saved in state_dict
+        When we start unfreezing the encoder, it is important not to call forward
+        on the encoder, but rather use the params here as these will be the ones'''
+
         self.vit_params = [
             self.image_encoder.blocks,
             self.image_encoder.pos_embed,
@@ -75,7 +79,7 @@ class GPT(nn.Module):
         self.unfreeze_general_params()
 
         sched = self.o.train_config.decoder_unfreeze_unified
-        blocks_to_unfreeze = sched[epoch]
+        blocks_to_unfreeze = sched[epoch] if epoch in sched else []
 
         pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
         if len(pretty_blocks) > 0:

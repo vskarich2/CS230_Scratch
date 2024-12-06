@@ -185,6 +185,7 @@ class Trainer:
         if not self.args.local_mode:
             self.train_config.model_path.mkdir(exist_ok=True)
             sd = self.model.state_dict()
+            print(f'Saving model...{self.model_name}')
             torch.save(sd, self.train_config.model_path / self.model_name)
 
     def load_saved_model(self):
