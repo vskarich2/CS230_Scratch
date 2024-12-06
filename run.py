@@ -1,5 +1,10 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
+
+from metrics.cider import calculate_coco_scores
+
+
 
 from utils import *
 
@@ -33,6 +38,7 @@ def get_args():
 
     parser.add_argument("--infer_count", type=int, default=25)
 
+    parser.add_argument("--coco_test_count", type=int, default=1000)
     parser.add_argument("--mode", type=str, default="cross")
 
     parser.add_argument("--num_workers", type=int, default=4)
@@ -63,6 +69,57 @@ def setup(args):
     else:
         model_path = REMOTE_MODEL_LOCATION
 
+    decoder_unfreeze_unified = {
+        0: [10,11],
+        1: [10,11],
+        2: [8,9,10,11],
+        3: [8,9,10,11],
+        4: [6,7,8,9,10,11],
+        5: [6,7,8,9,10,11],
+        6: [4,5,6,7,8,9,10,11],
+        7: [4,5,6,7,8,9,10,11],
+        8: [2,3,4,5,6,7,8,9,10,11],
+        9: [2,3,4,5,6,7,8,9,10,11],
+    }
+
+    encoder_unfreeze_unified = {
+        0: [],
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: [],
+        6: [10, 11],
+        7: [10, 11],
+        8: [8, 9, 10, 11],
+        9: [8, 9, 10, 11],
+    }
+
+    decoder_unfreeze_cross = {
+        0: [],
+        1: [],
+        2: [],
+        3: [10, 11],
+        4: [10, 11],
+        5: [8, 9, 10, 11],
+        6: [8, 9, 10, 11],
+        7: [6, 7, 8, 9, 10, 11],
+        8: [6, 7, 8, 9, 10, 11],
+        9: [4, 5, 6, 7, 8, 9, 10, 11],
+    }
+
+    encoder_unfreeze_cross = {
+        0: [],
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        5: [],
+        6: [10, 11],
+        7: [10, 11],
+        8: [8, 9, 10, 11],
+        9: [8, 9, 10, 11],
+    }
     model_config = SimpleNamespace(
         vocab_size=50_257,
         embed_dim=768,
@@ -73,7 +130,7 @@ def setup(args):
         residual_dropout=0.1,
         mlp_ratio=4,
         mlp_dropout=0.1,
-        emb_dropout=0.1,
+        emb_dropout=0.1
     )
 
     train_config = SimpleNamespace(
@@ -85,7 +142,11 @@ def setup(args):
         num_workers=args.num_workers,
         model_name=create_model_name(args),
         train_size=None,
-        valid_size=None
+        valid_size=None,
+        encoder_unfreeze_cross=encoder_unfreeze_cross,
+        decoder_unfreeze_cross=decoder_unfreeze_cross,
+        encoder_unfreeze_unified=encoder_unfreeze_unified,
+        decoder_unfreeze_unified=decoder_unfreeze_unified
     )
 
     o = SimpleNamespace(
@@ -108,6 +169,8 @@ if __name__ == "__main__":
     seed_everything(args.seed)
     trainer = setup(args)
     results_file_path = trainer.train_config.model_path / f'{trainer.model_name}.txt'
+
+    #calculate_coco_scores(trainer.o)
 
     if args.train:
         result = trainer.fit()

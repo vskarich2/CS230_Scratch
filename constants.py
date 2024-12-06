@@ -8,6 +8,11 @@ REMOTE_DISTANCE_DATA_LOCATION = '/root/kaggle-data/distance'
 
 LOCAL_TEST_DATA_BASE_FOLDER = '/Users/vskarich/CS230_Scratch_Large/local_data/images/Flicker8k_Dataset'
 
+LOCAL_COCO_CAPTION = '/Users/vskarich/CS230_Scratch_Large/captions_val2014.json'
+LOCAL_COCO_RESULTS = '/Users/vskarich/CS230_Scratch_Large/captions_val2014_fakecap_results.json'
+
+REMOTE_COCO_CAPTION = '/root/kaggle-data/coco2017/annotations/captions_train2017.json'
+REMOTE_COCO_RESULTS = '/root/coco_results/results.json'
 
 NUM_IMAGE_TOKENS = 197 # 196 patches + 1 CLS token
 IMAGE_SIZE = 224

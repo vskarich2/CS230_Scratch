@@ -1,6 +1,8 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
 
+from project_datasets.captioning_dataset import no_aug_tfms
 from models.cross_attention_model.gpt2_vit_combined_model import VisionGPT2Model
 from models.unified_attention_model.gpt2_unified_model import GPT
 
@@ -38,7 +40,7 @@ class Trainer:
             if self.args.mode == 'cross':
                 self.model = VisionGPT2Model.from_pretrained(self.model_config, self.args).to(self.device)
             else:
-                self.model = GPT.from_pretrained(self.model_config, self.args).to(self.device)
+                self.model = GPT.from_pretrained(o).to(self.device)
 
         self.model.pretrained_layers_trainable(trainable=False)
 
@@ -91,6 +93,7 @@ class Trainer:
             self.model.eval()
             prog.set_description('validating')
             valid = self.valid_one_epoch(epoch)
+
             self.clean()
 
             if valid < best_valid:
@@ -167,12 +170,12 @@ class Trainer:
         self.log('valid_loss', val_loss)
 
         return val_loss
+    def test_one_epoch(self):
+        for i in range(self.o.args.coco_test_count):
+           test = self.df_v.sample(n=1).values[0]
+           test_img, test_caption = test[0], test[1]
+           gen_caption = self.generate_caption(test_img)
 
-
-    # def test_one_epoch():
-    #     for i in range(self.args.bleu_count):
-    #         test = self.valid_df.sample(n=1).values[0]
-    #         test_img, test_caption = test[0], test[1]
 
     def clean(self):
         gc.collect()
@@ -199,12 +202,12 @@ class Trainer:
         self.model.to(self.device)
 
     @torch.no_grad()
-    def generate_caption(self, image, max_tokens=50, temperature=1.0, sampling_method='multinomial'):
+    def generate_caption(self, image, max_tokens=50, temperature=0.75, sampling_method='multinomial'):
         self.model.eval()
 
         image = Image.open(image).convert('RGB')
         image = np.array(image)
-        image = self.dataset.no_aug_tfms(image=image)['image']
+        image = no_aug_tfms(image=image)['image']
         image = image.unsqueeze(0).to(self.device)
         sequence = torch.ones(1, 1).to(device=self.device).long() * self.tokenizer.bos_token_id
 

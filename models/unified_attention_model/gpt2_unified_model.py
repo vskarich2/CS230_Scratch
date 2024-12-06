@@ -1,5 +1,6 @@
 import warnings
-
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
 import torch
 
 from constants import EOS_TOKEN_ID, NUM_IMAGE_TOKENS
@@ -10,15 +11,14 @@ from einops import rearrange
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-warnings.filterwarnings("ignore")
 import torch.nn as nn
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 class GPT(nn.Module):
-    def __init__(self, config, args):
+    def __init__(self, o):
         super().__init__()
-        self.args = args
-        self.config = config
+        self.o = o
+        self.m_cnfg = o.model_config
         self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
@@ -27,19 +27,19 @@ class GPT(nn.Module):
         # state_dict for pre-trained GPT models
 
         self.transformer = nn.ModuleDict(dict(
-            wte=nn.Embedding(config.vocab_size, config.embed_dim),  # This is the token embedding
-            wpe=nn.Embedding(config.seq_len, config.embed_dim),  # This is the positional embedding
-            drop=nn.Dropout(config.emb_dropout),
-            h=nn.ModuleList([GPT2UnifiedBlock(config, self.args) for _ in range(config.depth)]),
-            ln_f=nn.LayerNorm(config.embed_dim)
+            wte=nn.Embedding(self.m_cnfg.vocab_size, self.m_cnfg.embed_dim),  # This is the token embedding
+            wpe=nn.Embedding(self.m_cnfg.seq_len, self.m_cnfg.embed_dim),  # This is the positional embedding
+            drop=nn.Dropout(self.m_cnfg.emb_dropout),
+            h=nn.ModuleList([GPT2UnifiedBlock(self.m_cnfg, self.o.args) for _ in range(self.m_cnfg.depth)]),
+            ln_f=nn.LayerNorm(self.m_cnfg.embed_dim)
         ))
 
-        self.lm_head = nn.Linear(config.embed_dim, config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(self.m_cnfg.embed_dim, self.m_cnfg.vocab_size, bias=False)
 
         # Weight Tying
         self.transformer.wte.weight = self.lm_head.weight
 
-        self.image_encoder = ImageEncoder(self.config, self.args)
+        self.image_encoder = ImageEncoder(o)
 
         self.general_gpt_params = [
             self.transformer.wte,
@@ -53,7 +53,7 @@ class GPT(nn.Module):
             self.transformer.h[i].ln_2,
             self.transformer.h[i].attn,
             self.transformer.h[i].mlp
-        ] for i in range(self.config.depth)]
+        ] for i in range(self.m_cnfg.depth)]
 
         self.blocks = self.gpt_layers # More sensibly named reference for unfreezing
 
@@ -62,17 +62,10 @@ class GPT(nn.Module):
 
         self.vit_params = [
             self.image_encoder.blocks,
-            self.image_encoder.vit_pos_embed,
-            self.image_encoder.vit_cls_token,
-            self.image_encoder.vit_patch_embed
+            self.image_encoder.pos_embed,
+            self.image_encoder.cls_token,
+            self.image_encoder.patch_embed
         ]
-
-    def gpt_unfreezing_schedule(self, epoch):
-        unfreeze_layers = []
-        layers = [x for x in range(11, -1, -1)]
-        if epoch % 2 == 0: # Check if even epoch
-            unfreeze_layers = layers[0:epoch + 2]
-        return unfreeze_layers
 
     def unfreeze_general_params(self):
         for param in self.general_gpt_params:
@@ -81,10 +74,10 @@ class GPT(nn.Module):
     def unfreeze_layers(self, epoch):
         self.unfreeze_general_params()
 
-        blocks_to_unfreeze = self.gpt_unfreezing_schedule(epoch)
+        sched = self.o.train_config.decoder_unfreeze_unified
+        blocks_to_unfreeze = sched[epoch]
 
         pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
-        pretty_blocks = pretty_blocks[::-1]
         if len(pretty_blocks) > 0:
             print(f'\nUnfreezing GPT layers: {pretty_blocks}')
 
@@ -107,7 +100,7 @@ class GPT(nn.Module):
             else:
                 layer.requires_grad = trainable
 
-    def create_unified_input(self, token_ids, image):
+    def create_unified_input(self, token_ids, enriched_image):
         '''
         One fortunate thing is that the image sequences are all the same length,
         so we don't need to worry about padding modifications. I'm pre-pending a
@@ -121,17 +114,15 @@ class GPT(nn.Module):
         positional_embeddings = self.transformer.wpe(positions)
         text_embeddings = self.transformer.drop(token_embeddings + positional_embeddings)
 
-        image_patch_embeddings = self.image_encoder.vit_patch_embed(image)
-        image_embeddings = self.image_encoder.pos_embed(image_patch_embeddings)
 
         # Now we re-apply the image encoder positional encoding to the encoded image embeddings
         # I could have trained new position embeddings but re-use is simpler and more efficient
         # and my assumption is that this choice won't have a significant negative impact on my results.
 
-        pos_image_embeddings = self.image_encoder.vit_pos_embed + image_embeddings
+        enriched_image = self.image_encoder.add_pos_embed(enriched_image)
 
         # The text tokens are appended to the image tokens, this ordering is important for masking in unified attention.
-        unified_embeddings = torch.concat((pos_image_embeddings, text_embeddings), dim=1)
+        unified_embeddings = torch.concat((enriched_image, text_embeddings), dim=1)
 
         return unified_embeddings
 
@@ -146,10 +137,12 @@ class GPT(nn.Module):
         in the original caption. We use cross entropy loss to compare the output sequence to the label and
         adjust weights with backprop.
         '''
-        input_embeddings = self.create_unified_input(token_ids, image)
+
+        enriched_image = self.image_encoder.forward(image)
+        input_embeddings = self.create_unified_input(token_ids, enriched_image)
 
         hidden_state = input_embeddings
-        for i in range(self.config.depth):
+        for i in range(self.m_cnfg.depth):
             hidden_state = self.transformer.h[i](hidden_state)
 
         hidden_state = self.transformer.ln_f(hidden_state)
@@ -214,9 +207,9 @@ class GPT(nn.Module):
 
 
     @staticmethod
-    def from_pretrained(config, args):
+    def from_pretrained(o):
 
-        model = GPT(config, args)
+        model = GPT(o)
         sd = model.state_dict()
 
         gpt2_small = GPT2LMHeadModel.from_pretrained('gpt2')

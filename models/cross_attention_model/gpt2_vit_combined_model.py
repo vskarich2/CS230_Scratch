@@ -1,9 +1,10 @@
 import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
 
 from constants import EOS_TOKEN_ID
 from models.image_encoder import ImageEncoder
 
-warnings.filterwarnings("ignore")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -22,52 +23,61 @@ class VisionGPT2Model(nn.Module):
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
-
-        vit = create_model(
-            'vit_base_patch16_224',
-            pretrained=False,
-            num_classes=0
-        )
-
-        self.patch_embed = vit.patch_embed
-
-        self.cls_token = vit.cls_token
-        self.pos_embed = vit.pos_embed
-
-        # No dropout for pos embedding for now
-        self.pos_drop = nn.Dropout(p=0.)
-
-        # Depth here is 12, and these are the ViT blocks in the vision model
-        self.vision_blocks = nn.ModuleList([vit.blocks[i] for i in range(config.depth)])
+        # Note: the names of these parameter fields are meant to match the names of the
+        # state_dict for pre-trained GPT models
 
         self.transformer = nn.ModuleDict(dict(
-            wte=nn.Embedding(config.vocab_size, config.embed_dim), # This is the token embedding
-            wpe=nn.Embedding(config.seq_len, config.embed_dim), # This is the positional embedding
-            drop=nn.Dropout(config.emb_dropout),
-            h=nn.ModuleList([GPT2Block(config, self.args) for _ in range(config.depth)]),
-            ln_f=nn.LayerNorm(config.embed_dim)
+            wte=nn.Embedding(self.m_cnfg.vocab_size, self.m_cnfg.embed_dim),  # This is the token embedding
+            wpe=nn.Embedding(self.m_cnfg.seq_len, self.m_cnfg.embed_dim),  # This is the positional embedding
+            drop=nn.Dropout(self.m_cnfg.emb_dropout),
+            h=nn.ModuleList([GPT2Block(self.m_cnfg, self.args) for _ in range(self.m_cnfg.depth)]),
+            ln_f=nn.LayerNorm(self.m_cnfg.embed_dim)
         ))
 
-        self.lm_head = nn.Linear(config.embed_dim, config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(self.m_cnfg.embed_dim, self.m_cnfg.vocab_size, bias=False)
+
+        # Weight Tying
         self.transformer.wte.weight = self.lm_head.weight
 
-    def gpt_unfreezing_schedule(self, epoch):
-        unfreeze_layers = []
-        layers = [x for x in range(11, -1, -1)]
-        if epoch % 2 == 0: # Check if even epoch
-            unfreeze_layers = layers[0:epoch + 2]
-        return unfreeze_layers
+        self.image_encoder = ImageEncoder(self.config, self.args)
 
-    # First train cross attention 2 epochs with learning rate around 1e-3
+        self.general_gpt_params = [
+            self.transformer.wte,
+            self.transformer.wpe,
+            self.transformer.ln_f,
+            self.lm_head
+        ]
 
-    # Second Unfreeze GPT2 layers on epoch 3 lr=1e-5 1 layer per epoch
+        self.gpt_layers = [[
+            self.transformer.h[i].ln_1,
+            self.transformer.h[i].ln_2,
+            self.transformer.h[i].attn,
+            self.transformer.h[i].mlp
+        ] for i in range(self.config.depth)]
 
-    # Third Unfreeze Encoder layers on epoch 6 lr=1e-5 1 layer per epoch
+        self.blocks = self.gpt_layers  # More sensibly named reference for unfreezing
+
+        for l in self.gpt_layers:
+            self.general_gpt_params.extend(l)
+
+        self.vit_params = [
+            self.image_encoder.blocks,
+            self.image_encoder.vit_pos_embed,
+            self.image_encoder.vit_cls_token,
+            self.image_encoder.vit_patch_embed
+        ]
+
+    def unfreeze_general_params(self):
+        for param in self.general_gpt_params:
+            param.requires_grad = True
+
     def unfreeze_layers(self, epoch):
-        blocks_to_unfreeze = self.gpt_unfreezing_schedule(epoch)
+        self.unfreeze_general_params()
+
+        sched = self.o.train_config.decoder_unfreeze_unified
+        blocks_to_unfreeze = sched[epoch]
 
         pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
-        pretty_blocks = pretty_blocks[::-1]
         if len(pretty_blocks) > 0:
             print(f'\nUnfreezing GPT layers: {pretty_blocks}')
 
@@ -84,34 +94,16 @@ class VisionGPT2Model(nn.Module):
         return self.pos_drop(x)
 
     def pretrained_layers_trainable(self, trainable=False):
-        layers = [
-            self.cls_token,
-            self.patch_embed,
-            self.pos_embed,
-            self.vision_blocks,
-            self.transformer.wte,
-            self.transformer.wpe,
-            self.transformer.ln_f,
-            self.lm_head
-        ]
+        all_params = []
+        all_params.extend(self.general_gpt_params)
+        all_params.extend(self.vit_params)
 
-        gpt_layers = [[
-            self.transformer.h[i].ln_1,
-            self.transformer.h[i].ln_2,
-            self.transformer.h[i].attn,
-            self.transformer.h[i].mlp
-        ] for i in range(self.config.depth)]
-
-        for l in gpt_layers:
-            layers.extend(l)
-
-        for layer in layers:
+        for layer in all_params:
             if not isinstance(layer, nn.Parameter):
                 for p in layer.parameters():
                     p.requires_grad = trainable
             else:
                 layer.requires_grad = trainable
-
 
     def unfreeze_gpt_layers(self):
         gpt_layers = [[
