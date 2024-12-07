@@ -119,7 +119,7 @@ class Trainer:
 
         running_loss = 0.
         prog = tqdm(self.train_dl,total=len(self.train_dl))
-        print(f'EPOCH {epoch}')
+        print(f'\nEPOCH {epoch}\n')
         for image, input_ids, labels in prog:
             # This is necessary because of lower-cost mixed-precision training
             with autocast():
@@ -197,11 +197,11 @@ class Trainer:
             )
 
             self.log_test_result(
-                str(test_img),
-                actual_caption,
-                gen_caption,
-                image_id,
-                test_table
+                image=str(test_img),
+                actual_caption=actual_caption,
+                model_caption=gen_caption,
+                img_id=image_id,
+                test_table=test_table
             )
 
         wandb.log({f"test_captions epoch {epoch} ": test_table})
@@ -214,8 +214,7 @@ class Trainer:
             img_id,
             test_table
     ):
-
-        test_table.add_data(img_id, wandb.Image(image), actual_caption, model_caption)
+        test_table.add_data(img_id, wandb.Image(image), model_caption, actual_caption)
 
     def clean(self):
         gc.collect()
