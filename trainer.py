@@ -213,18 +213,18 @@ class Trainer:
                     test_table=test_table
                 )
 
-            coco_result = {
-                "image_id": image_id, "caption": gen_caption
-            }
-            coco_results.append(coco_result)
-
-        os.remove(REMOTE_COCO_RESULTS)
-        with open(REMOTE_COCO_RESULTS, 'w') as f:
-            json.dump(coco_results, f)
+        #     coco_result = {
+        #         "image_id": image_id, "caption": gen_caption
+        #     }
+        #     coco_results.append(coco_result)
+        #
+        # os.remove(REMOTE_COCO_RESULTS)
+        # with open(REMOTE_COCO_RESULTS, 'w') as f:
+        #     json.dump(coco_results, f)
 
         metrics.cider.calculate_coco_scores(self.o)
-
-        wandb.log({f"test_captions epoch {epoch} ": test_table})
+        if self.o.args.log_wandb:
+            wandb.log({f"test_captions epoch {epoch} ": test_table})
 
     def log_test_result(
             self,
