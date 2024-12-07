@@ -21,14 +21,7 @@ class GPT2Block(nn.Module):
         self.cross_attn = GPT2CrossAttention(config)
 
     def forward(self, x, enc_out):
-        if self.args.shortcut:
-            shortcut = x
-            x = x + self.attn(self.ln_1(x))
-            x = x + self.cross_attn(self.ln_2(x), enc_out, enc_out)
-            x = x + self.mlp(self.ln_3(x))
-            x = x + shortcut
-        else:
-            x = x + self.attn(self.ln_1(x))
-            x = x + self.cross_attn(self.ln_2(x), enc_out, enc_out)
-            x = x + self.mlp(self.ln_3(x))
+        x = x + self.attn(self.ln_1(x))
+        x = x + self.cross_attn(self.ln_2(x), enc_out, enc_out)
+        x = x + self.mlp(self.ln_3(x))
         return x

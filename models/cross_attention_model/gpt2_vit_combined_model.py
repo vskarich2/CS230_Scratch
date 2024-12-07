@@ -44,7 +44,7 @@ class CrossAttentionModel(nn.Module):
         print(f'Total params GPT: {sum([p.numel() for p in self.parameters() if p.requires_grad])}')
 
         self.image_encoder = ImageEncoder(o)
-
+        self.vision_blocks = self.image_encoder.blocks
         '''It is important to surface these here so that they are saved in state_dict
         When we start unfreezing the encoder, it is important not to call forward
         on the encoder, but rather use the params here as these will be the ones'''
@@ -76,10 +76,9 @@ class CrossAttentionModel(nn.Module):
 
 
     def vit_pos_embed(self, x):
-        pos_embed = self.pos_embed
-        x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
-        x = x + pos_embed
-        return self.pos_drop(x)
+        x = torch.cat((self.image_encoder.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
+        x = x + self.image_encoder.pos_embed
+        return self.image_encoder.pos_drop(x)
 
     def check_unfreeze(self, epoch):
         if self.o.args.unfreeze_gpt:
@@ -164,14 +163,7 @@ class CrossAttentionModel(nn.Module):
 
     def forward(self, image, token_ids, labels=None):
 
-        # The patch embedding flattens the 2D patches of the image into 1D vectors
-
-        # Batch Size x 3 RGB x 224 x 224
-        image_embeddings = self.patch_embed(image) # The patch embedding flattens the 2D patches of the image into 1D vectors
-
-        # Batch Size x 197 x 768 (each 16 by 16 patch is flattened to vector of 196 + 1
-        image_embeddings = self.vit_pos_embed(image_embeddings)
-
+        enriched_image = self.image_encoder.forward(image)
         # Batch Size x max sequence length in batch
         token_embeddings = self.transformer.wte(token_ids)  # batch x seq_len
 
@@ -185,17 +177,14 @@ class CrossAttentionModel(nn.Module):
         text_input_embeddings = self.transformer.drop(token_embeddings + positional_embeddings)
 
         # Batch Size x 197 x 768
-        vit_hidden_state = image_embeddings
-
-        for i in range(self.config.depth):
-            vit_hidden_state = self.vision_blocks[i](vit_hidden_state)
+        vit_hidden_state = enriched_image
 
         # Position Embed image tokens again
-        vit_hidden_state = self.vit_pos_embed(vit_hidden_state)
+        vit_hidden_state = self.image_encoder.add_pos_embed(vit_hidden_state)
 
         # Batch Size x max sequence length in batch x 768
         gpt_hidden_state = text_input_embeddings
-        for i in range(self.config.depth):
+        for i in range(self.o.model_config.depth):
 
             # Note that gpt and vit both have hidden state embedding dimension of 768
             gpt_hidden_state = self.transformer.h[i](gpt_hidden_state, vit_hidden_state)
