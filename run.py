@@ -62,6 +62,7 @@ def get_args():
                         default=1e-4)
 
     parser.add_argument("--log_wandb", action='store_true')
+    parser.add_argument("--coco_test", action='store_true')
 
     args = parser.parse_args()
 
