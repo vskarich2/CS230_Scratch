@@ -1,4 +1,9 @@
+import json
+import os
 import warnings
+
+from constants import REMOTE_COCO_RESULTS
+#import metrics.cider
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -187,6 +192,8 @@ class Trainer:
         columns = ["image_id", "image", "model", "actual"]
         test_table = wandb.Table(columns=columns)
 
+        coco_results = []
+
         for i in range(self.o.args.coco_test_count):
             test = self.df_v.sample(n=1).values[0]
             test_img, actual_caption, image_id = test[0], test[1], test[2]
@@ -203,6 +210,20 @@ class Trainer:
                 img_id=image_id,
                 test_table=test_table
             )
+
+            coco_result = {
+                "image_id": image_id, "caption": gen_caption
+            }
+            coco_results.append(coco_result)
+
+        # os.remove(REMOTE_COCO_RESULTS)
+        # with open(REMOTE_COCO_RESULTS, 'w') as f:
+        #     json.dump(coco_results, f)
+        #
+        # items = metrics.cider.calculate_coco_scores(self.o)
+        # # print output evaluation scores
+        # for metric, score in coco_eval.eval.items():
+        #     print(f'{metric}: {score:.3f}')
 
         wandb.log({f"test_captions epoch {epoch} ": test_table})
 
