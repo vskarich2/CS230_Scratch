@@ -3,7 +3,7 @@ from pycocoevalcap.eval import COCOEvalCap
 from constants import *
 
 def calculate_coco_scores(o):
-    if o.args.local_mode:
+    if o.args.local:
         annotation_file = LOCAL_COCO_CAPTION
         results_file = LOCAL_COCO_RESULTS
     else:
