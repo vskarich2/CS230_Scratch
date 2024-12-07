@@ -36,8 +36,6 @@ def get_args():
 
     parser.add_argument("--distance_word", action='store_true')
 
-    parser.add_argument("--infer_count", type=int, default=25)
-
     parser.add_argument("--coco_test_count", type=int, default=10)
 
     parser.add_argument("--mode", type=str, default="cross")
