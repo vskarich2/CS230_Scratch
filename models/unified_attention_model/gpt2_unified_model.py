@@ -119,10 +119,8 @@ class UnifiedAttentionModel(nn.Module):
 
         blocks_to_unfreeze = sched[epoch] if epoch in sched else []
 
-        pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
-
-        if len(pretty_blocks) > 0:
-            print(f'\nUnfreezing VIT layers: {pretty_blocks}')
+        if len(blocks_to_unfreeze) > 0:
+            print(f'\nUnfreezing VIT layers: {blocks_to_unfreeze}')
 
             for block_num in blocks_to_unfreeze:
                 block = self.vit_blocks[block_num]
