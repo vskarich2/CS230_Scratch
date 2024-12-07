@@ -119,6 +119,7 @@ class Trainer:
 
         running_loss = 0.
         prog = tqdm(self.train_dl,total=len(self.train_dl))
+        print(f'EPOCH {epoch}')
         for image, input_ids, labels in prog:
             # This is necessary because of lower-cost mixed-precision training
             with autocast():

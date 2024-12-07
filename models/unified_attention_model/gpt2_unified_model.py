@@ -101,9 +101,8 @@ class UnifiedAttentionModel(nn.Module):
         blocks_to_unfreeze = sched[epoch] if epoch in sched else []
 
         if len(blocks_to_unfreeze) > 0:
-            pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
-            print(f'\nUnfreezing GPT layers: {pretty_blocks}')
 
+            print(f'\nUnfreezing GPT layers: {blocks_to_unfreeze}')
             for block_num in blocks_to_unfreeze:
                 block = self.gpt_blocks[block_num]
                 for layer in block:
