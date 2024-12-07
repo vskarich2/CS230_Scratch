@@ -1,4 +1,7 @@
 import warnings
+
+import metrics.cider
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -177,6 +180,8 @@ if __name__ == "__main__":
 
     if args.train:
         trainer.fit()
+    elif args.coco_test:
+        metrics.cider.calculate_coco_scores(trainer.o)
     else:
         wandb.init(
             # set the wandb project where this run will be logged

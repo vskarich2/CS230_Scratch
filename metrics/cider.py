@@ -29,3 +29,5 @@ def calculate_coco_scores(o):
     # print output evaluation scores
     for metric, score in coco_eval.eval.items():
         print(f'{metric}: {score:.3f}')
+
+
