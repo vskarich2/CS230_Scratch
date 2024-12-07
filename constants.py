@@ -1,12 +1,14 @@
 EOS_TOKEN_ID=50256
-LOCAL_MODEL_LOCATION = '/Users/vskarich/CS230_Scratch_Large'
-REMOTE_MODEL_LOCATION = '/root/models'
-REMOTE_COCO_DATA_LOCATION = '/root/kaggle-data/coco2017'
+LOCAL_MODEL_DIR = '/Users/vskarich/CS230_Scratch_Large/models'
+REMOTE_MODEL_DIR = '/root/models'
 
-LOCAL_DISTANCE_DATA_LOCATION = '/Users/vskarich/CS230_Scratch_Large/distance'
-REMOTE_DISTANCE_DATA_LOCATION = '/root/kaggle-data/distance'
+LOCAL_COCO_DATA_DIR = '/Users/vskarich/CS230_Scratch_Large/kaggle-data/coco2017'
+REMOTE_COCO_DATA_DIR = '/root/kaggle-data/coco2017'
 
-LOCAL_TEST_DATA_BASE_FOLDER = '/Users/vskarich/CS230_Scratch_Large/local_data/images/Flicker8k_Dataset'
+LOCAL_DISTANCE_DATA_DIR = '/Users/vskarich/CS230_Scratch_Large/distance'
+REMOTE_DISTANCE_DATA_DIR = '/root/kaggle-data/distance'
+
+LOCAL_TEST_DATA_BASE_DIR = '/Users/vskarich/CS230_Scratch_Large/local_data/images/Flicker8k_Dataset'
 
 LOCAL_COCO_CAPTION = '/Users/vskarich/CS230_Scratch_Large/captions_val2014.json'
 LOCAL_COCO_RESULTS = '/Users/vskarich/CS230_Scratch_Large/captions_val2014_fakecap_results.json'

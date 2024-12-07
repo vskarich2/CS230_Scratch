@@ -11,9 +11,10 @@ class ImageEncoder(nn.Module):
         self.args = o.args
         self.config = o.model_config
 
+        print(f'Loading pre-trained vit_base_patch16_224...')
         vit = create_model(
             'vit_base_patch16_224',
-            pretrained=False,
+            pretrained=True,
             num_classes=0
         )
 
@@ -23,12 +24,17 @@ class ImageEncoder(nn.Module):
         self.cls_token = vit.cls_token
         self.pos_drop = nn.Dropout(p=0.)
 
+        # At this point we only have defined VIT params so this will only print those
+        print(f'Total params VIT: {sum([p.numel() for p in self.parameters() if p.requires_grad])}')
+
     def pos_embed_with_cls(self, x):
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
         x = x + self.pos_embed
         return self.pos_drop(x)
+
     def add_pos_embed(self, image):
         return self.pos_embed + image
+
     def create_image_input(self, image):
         patch_emb = self.patch_embed(image)
         pos_patch_emb = self.pos_embed_with_cls(patch_emb)
@@ -36,7 +42,7 @@ class ImageEncoder(nn.Module):
 
     def forward(self, image):
 
-        # "Tokenizes" the image into 16x16 patches
+
 
 
         hidden_state = self.create_image_input(image)

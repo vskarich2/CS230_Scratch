@@ -3,8 +3,8 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 from project_datasets.captioning_dataset import no_aug_tfms
-from models.cross_attention_model.gpt2_vit_combined_model import VisionGPT2Model
-from models.unified_attention_model.gpt2_unified_model import GPT
+from models.cross_attention_model.gpt2_vit_combined_model import CrossAttentionModel
+from models.unified_attention_model.gpt2_unified_model import UnifiedAttentionModel
 
 import wandb
 from tqdm import tqdm
@@ -12,7 +12,7 @@ from tqdm import tqdm
 from project_datasets import captioning_dataset as ds
 import pandas as pd
 import gc
-from PIL import Image
+import PIL.Image
 import numpy as np
 from torch.cuda.amp import GradScaler, autocast
 from transformers import GPT2TokenizerFast
@@ -34,15 +34,13 @@ class Trainer:
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
-        if self.args.model_location != "":
-            self.load_saved_model()
+        if self.args.model_file:
+            self.model = self.load_saved_model()
         else:
-            if self.args.mode == 'cross':
-                self.model = VisionGPT2Model.from_pretrained(self.model_config, self.args).to(self.device)
-            else:
-                self.model = GPT.from_pretrained(o).to(self.device)
+            self.model = self.load_pretrained_model()
 
-        self.model.pretrained_layers_trainable(trainable=False)
+        self.model.freeze_all_layers_all_models(trainable=False)
+        self.print_trainable_params()
 
         self.train_dl, self.valid_dl, self.df_v = ds.create_data(o)
 
@@ -51,7 +49,9 @@ class Trainer:
 
         total_steps = len(self.train_dl)
 
+        # The optimizer lr becomes the minimum lr under OneCycleLR
         self.optim = torch.optim.Adam(self.model.parameters(), lr=self.train_config.lr / 25.)
+
         self.sched = torch.optim.lr_scheduler.OneCycleLR(
             self.optim,
             max_lr=self.train_config.lr,
@@ -66,6 +66,7 @@ class Trainer:
 
                 # track hyperparameters and run metadata
                 config={
+                    "name": f"experiment_{o.train_config.model_name}",
                     "learning_rate": 1e-4,
                     "architecture": o.args.mode,
                     "dataset": o.args.data,
@@ -81,7 +82,8 @@ class Trainer:
         prog = tqdm(range(self.train_config.epochs))
         for epoch in prog:
 
-            self.model.unfreeze_layers(epoch)
+            self.model.check_unfreeze(epoch)
+            self.print_trainable_params()
 
             # Put model in training mode
             self.model.train()
@@ -107,6 +109,8 @@ class Trainer:
     def log(self, name, value):
         if self.o.args.log_wandb:
             wandb.log({name: value})
+    def print_trainable_params(self):
+        print(f'Total trainable params: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
 
     def train_one_epoch(self, epoch):
 
@@ -170,43 +174,86 @@ class Trainer:
         self.log('valid_loss', val_loss)
 
         return val_loss
-    def test_one_epoch(self):
-        for i in range(self.o.args.coco_test_count):
-           test = self.df_v.sample(n=1).values[0]
-           test_img, test_caption = test[0], test[1]
-           gen_caption = self.generate_caption(test_img)
 
+    @torch.no_grad()
+    def test_one_epoch(self):
+        print(f'Running test epoch...')
+        for i in range(self.o.args.coco_test_count):
+            test = self.df_v.sample(n=1).values[0]
+            test_img, test_caption, id = test[0], test[1], test[2]
+            self.compare_captions(
+                test_img,
+                test_caption,
+                id,
+                self.o.args.sampling_method,
+                self.o.args.temp,
+            )
+    def compare_captions(self, test_img, test_caption, id, sampling_method, temp):
+        gen_caption = self.generate_caption(
+            test_img,
+            temperature=temp,
+            sampling_method=sampling_method
+        )
+        result = {}
+        result["image_id"] = id
+        result["actual"] = test_caption
+        result["model"] = gen_caption
+
+        print(result)
 
     def clean(self):
         gc.collect()
         torch.cuda.empty_cache()
 
     def save_model(self):
-        if not self.args.local_mode:
-            self.train_config.model_path.mkdir(exist_ok=True)
-            sd = self.model.state_dict()
-            print(f'Saving model...{self.model_name}')
-            torch.save(sd, self.train_config.model_path / self.model_name)
+        #if not self.args.local_mode:
+        self.train_config.model_path.mkdir(exist_ok=True)
+        sd = self.model.state_dict()
+        print(f'Saving model...{self.model_name}')
+        torch.save(sd, self.train_config.model_path / self.model_name)
 
-    def load_saved_model(self):
+    def load_pretrained_model(self):
         args = self.args
 
-        print(f'Loading saved model...{args.model_location}')
+        print(f'Loading fresh multi-modal model...')
 
+        # This loads a model with pre-trained GPT and VIT weights
         if args.mode == 'cross':
-            self.model = VisionGPT2Model(self.model_config, args)
+            self.model = CrossAttentionModel.from_pretrained(self.o)
         else:
-            self.model = GPT(self.model_config, args)
+            self.model = UnifiedAttentionModel.from_pretrained(self.o)
 
-        sd = torch.load(self.train_config.model_path / args.model_location)
-        self.model.load_state_dict(sd)
         self.model.to(self.device)
+
+        return self.model
+
+    def load_saved_model(self, model_file=None):
+        args = self.args
+        model_file = model_file if model_file else args.model_file
+
+        print(f'Loading saved model...{model_file}')
+        print(f'First building pre-trained model...')
+        # This loads a model with pre-trained GPT and VIT weights
+        if args.mode == 'cross':
+            self.model = CrossAttentionModel(self.o)
+        else:
+            self.model = UnifiedAttentionModel(self.o)
+
+        sd = torch.load(self.train_config.model_path / args.model_file)
+
+        # Override the pre-trained weights with saved weights
+        self.model.load_state_dict(sd)
+        print(f'Overwriting pre-trained model with loaded state_dict...')
+
+        self.model.to(self.device)
+
+        return self.model
 
     @torch.no_grad()
     def generate_caption(self, image, max_tokens=50, temperature=0.75, sampling_method='multinomial'):
         self.model.eval()
 
-        image = Image.open(image).convert('RGB')
+        image = PIL.Image.open(image).convert('RGB')
         image = np.array(image)
         image = no_aug_tfms(image=image)['image']
         image = image.unsqueeze(0).to(self.device)

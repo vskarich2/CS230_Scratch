@@ -14,11 +14,11 @@ from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 from models.cross_attention_model.gpt2_vit_transformer import GPT2Block
 
-class VisionGPT2Model(nn.Module):
-    def __init__(self, config, args):
+class CrossAttentionModel(nn.Module):
+    def __init__(self, o):
         super().__init__()
-        self.args = args
-        self.config = config
+        self.args = o.args
+        self.config = o.config
         self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
@@ -214,7 +214,7 @@ class VisionGPT2Model(nn.Module):
     @staticmethod
     def from_pretrained(config, args):
 
-        model = VisionGPT2Model(config, args)
+        model = CrossAttentionModel(config, args)
         sd = model.state_dict()
 
         # These layers are of course not present in the generic GPT2 model

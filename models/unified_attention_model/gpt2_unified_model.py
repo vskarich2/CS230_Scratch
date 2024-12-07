@@ -7,14 +7,16 @@ from constants import EOS_TOKEN_ID, NUM_IMAGE_TOKENS
 from models.image_encoder import ImageEncoder
 from models.unified_attention_model.gpt2_unified_transformer import GPT2UnifiedBlock
 import torch.nn.functional as F
+import numpy as np
 from einops import rearrange
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+from collections.abc import Iterable
 
 import torch.nn as nn
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
-class GPT(nn.Module):
+class UnifiedAttentionModel(nn.Module):
     def __init__(self, o):
         super().__init__()
         self.o = o
@@ -39,68 +41,118 @@ class GPT(nn.Module):
         # Weight Tying
         self.transformer.wte.weight = self.lm_head.weight
 
+        # At this point we only have defined GPT params so this will only print those
+        print(f'Total params GPT: {sum([p.numel() for p in self.parameters() if p.requires_grad])}')
+
         self.image_encoder = ImageEncoder(o)
 
-        self.general_gpt_params = [
+        '''It is important to surface these here so that they are saved in state_dict
+        When we start unfreezing the encoder, it is important not to call forward
+        on the encoder, but rather use the params here as these will be the ones'''
+
+        # GPT trainable
+        self.gpt_general_params = [
             self.transformer.wte,
             self.transformer.wpe,
             self.transformer.ln_f,
             self.lm_head
         ]
 
-        self.gpt_layers = [[
+        self.gpt_blocks = [[
             self.transformer.h[i].ln_1,
             self.transformer.h[i].ln_2,
             self.transformer.h[i].attn,
             self.transformer.h[i].mlp
         ] for i in range(self.m_cnfg.depth)]
 
-        self.blocks = self.gpt_layers # More sensibly named reference for unfreezing
-
-        for l in self.gpt_layers:
-            self.general_gpt_params.extend(l)
-
-        '''It is important to surface these here so that they are saved in state_dict
-        When we start unfreezing the encoder, it is important not to call forward
-        on the encoder, but rather use the params here as these will be the ones'''
-
-        self.vit_params = [
-            self.image_encoder.blocks,
+        # ViT trainable
+        self.vit_general_params = [
             self.image_encoder.pos_embed,
             self.image_encoder.cls_token,
             self.image_encoder.patch_embed
         ]
 
-    def unfreeze_general_params(self):
-        for param in self.general_gpt_params:
+        self.vit_blocks = self.image_encoder.blocks
+        print(f'Total combined params: {sum([p.numel() for p in self.parameters() if p.requires_grad])}')
+
+    def check_unfreeze(self, epoch):
+        if self.o.args.unfreeze_gpt:
+            self.GPT_unfreeze_layers(epoch)
+        if self.o.args.unfreeze_vit:
+            self.VIT_unfreeze_layers(epoch)
+
+    def VIT_unfreeze_general_params(self):
+        for param in self.vit_general_params:
             param.requires_grad = True
 
-    def unfreeze_layers(self, epoch):
-        self.unfreeze_general_params()
+    def GPT_unfreeze_general_params(self):
+        for param in self.gpt_general_params:
+            param.requires_grad = True
 
-        sched = self.o.train_config.decoder_unfreeze_unified
+    def GPT_unfreeze_layers(self, epoch):
+
+        self.GPT_unfreeze_general_params()
+
+        if self.o.args.mode == 'unified':
+            sched = self.o.train_config.decoder_unfreeze_unified
+        else:
+            sched = self.o.train_config.decoder_unfreeze_cross
+
         blocks_to_unfreeze = sched[epoch] if epoch in sched else []
 
-        pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
-        if len(pretty_blocks) > 0:
+        if len(blocks_to_unfreeze) > 0:
+            pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
             print(f'\nUnfreezing GPT layers: {pretty_blocks}')
 
             for block_num in blocks_to_unfreeze:
-                block = self.blocks[block_num]
+                block = self.gpt_blocks[block_num]
                 for layer in block:
                     for p in layer.parameters():
                         p.requires_grad = True
 
-    def pretrained_layers_trainable(self, trainable=False):
+    def VIT_unfreeze_layers(self, epoch):
+        self.VIT_unfreeze_general_params()
+
+        if self.o.args.mode == 'unified':
+            sched = self.o.train_config.encoder_unfreeze_unified
+        else:
+            sched = self.o.train_config.encoder_unfreeze_cross
+
+        blocks_to_unfreeze = sched[epoch] if epoch in sched else []
+
+        pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
+
+        if len(pretty_blocks) > 0:
+            print(f'\nUnfreezing VIT layers: {pretty_blocks}')
+
+            for block_num in blocks_to_unfreeze:
+                block = self.vit_blocks[block_num]
+                for layer in block:
+                    for p in layer.parameters():
+                        p.requires_grad = True
+
+    def freeze_all_layers_all_models(self, trainable=False):
 
         all_params = []
-        all_params.extend(self.general_gpt_params)
-        all_params.extend(self.vit_params)
+
+        all_params.extend(self.gpt_general_params)
+        all_params.extend(self.vit_general_params)
+        all_params.extend(self.vit_blocks)
+
+        gpt_layers = [[
+            self.transformer.h[i].ln_1, self.transformer.h[i].ln_2,
+            self.transformer.h[i].attn, self.transformer.h[i].mlp
+        ] for i in range(self.o.model_config.depth)]
+        for l in gpt_layers:
+            all_params.extend(l)
+
 
         for layer in all_params:
+            # Full Block
             if not isinstance(layer, nn.Parameter):
                 for p in layer.parameters():
                     p.requires_grad = trainable
+            # General Param
             else:
                 layer.requires_grad = trainable
 
@@ -212,11 +264,13 @@ class GPT(nn.Module):
 
     @staticmethod
     def from_pretrained(o):
+        gpt2_small = GPT2LMHeadModel.from_pretrained('gpt2')
+        print(f'Loading pre-trained gpt2-small...')
 
-        model = GPT(o)
+        model = UnifiedAttentionModel(o)
+        # We are going to replace the random values in our model's sd with pretrained weights
         sd = model.state_dict()
 
-        gpt2_small = GPT2LMHeadModel.from_pretrained('gpt2')
         gpt2_state_dict = gpt2_small.state_dict()
 
         gpt2_sd_keys = gpt2_state_dict.keys()
@@ -239,3 +293,4 @@ class GPT(nn.Module):
         model.load_state_dict(sd)
 
         return model
+

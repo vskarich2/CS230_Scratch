@@ -4,11 +4,9 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 
 from metrics.cider import calculate_coco_scores
 
-
-
 from utils import *
 
-from constants import LOCAL_MODEL_LOCATION, REMOTE_MODEL_LOCATION
+from constants import LOCAL_MODEL_DIR, REMOTE_MODEL_DIR
 
 import argparse
 from pathlib import Path
@@ -32,20 +30,26 @@ def get_args():
 
     parser.add_argument("--data", type=str, default="coco")
 
-    parser.add_argument("--local_mode", action='store_true')
+    parser.add_argument("--local", action='store_true')
+    parser.add_argument("--unfreeze_gpt", action='store_true')
+    parser.add_argument("--unfreeze_vit", action='store_true')
 
     parser.add_argument("--distance_word", action='store_true')
 
     parser.add_argument("--infer_count", type=int, default=25)
 
-    parser.add_argument("--coco_test_count", type=int, default=1000)
+    parser.add_argument("--coco_test_count", type=int, default=100)
     parser.add_argument("--mode", type=str, default="cross")
 
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=32)
 
-    parser.add_argument("--model_location", type=str, default="")
-    parser.add_argument("--model_name", type=str, default="captioner.pt")
+
+    # This is for loading a saved model, specify a file name.
+    # The model folder is in constants.py
+    parser.add_argument("--model_file", type=str)
+
+    parser.add_argument("--model_name_suffix", type=str, default="captioner.pt")
 
     parser.add_argument("--sampling_method", type=str, default="multinomial")
     parser.add_argument("--temp", type=float, default=0.75)
@@ -62,12 +66,18 @@ def get_args():
 
     return args
 
+def create_model_name(args):
+    model_timestamp = datetime.now().strftime("%b-%d-%H:%M")
+    model_details = f'mode={args.mode},epochs={args.epochs},lr={args.lr}'
+    model_name = f'{model_timestamp}_{model_details}_{args.model_name_suffix}'
+    return model_name
+
 def setup(args):
 
-    if args.local_mode:
-        model_path = LOCAL_MODEL_LOCATION
+    if args.local:
+        model_path = LOCAL_MODEL_DIR
     else:
-        model_path = REMOTE_MODEL_LOCATION
+        model_path = REMOTE_MODEL_DIR
 
     decoder_unfreeze_unified = {
         0: [10,11],
@@ -162,35 +172,17 @@ def setup(args):
 
     return trainer
 
-
-
-
-
 if __name__ == "__main__":
     args = get_args()
     seed_everything(args.seed)
     trainer = setup(args)
-    results_file_path = trainer.train_config.model_path / f'{trainer.model_name}.txt'
-
-    #calculate_coco_scores(trainer.o)
-    # with open(results_file_path, "w") as file:
-    #     inference_test(trainer, args, file)
 
     if args.train:
-        result = trainer.fit()
-        # if not args.local_mode: # Use pre-trained weights locally because of mixed precision issues
-        #     load_best_model(trainer)
-        #     with open(results_file_path, "w") as file:
-        #         inference_test(trainer, file, args)
+        trainer.fit()
+    else:
+        trainer.test_one_epoch()
 
 
-
-    # with open(results_file_path, "w") as file:
-    #     if not args.local_mode:
-    #         file.write(trainer.metrics.dropna().to_string())
-    #
-    #     inference_test(trainer, file, args)
-    #     file.close()
 
 
 

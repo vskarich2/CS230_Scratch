@@ -10,7 +10,7 @@ import numpy as np
 
 import pandas as pd
 import torch
-from PIL import Image
+import PIL.Image
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from transformers import GPT2TokenizerFast
@@ -35,7 +35,7 @@ class CaptioningDataset:
         image = sample['image']
         caption = sample['caption']
 
-        image = Image.open(image).convert('RGB')
+        image = PIL.Image.open(image).convert('RGB')
         image = np.array(image)
         augs = self.tfms(image=image)
         image = augs['image']
@@ -133,18 +133,15 @@ def create_data(o):
 
 
 def load_dataframes(o):
-    if o.args.local_mode:
-        return load_local_data(o)
+    if o.args.data == 'distance':
+        df_t, df_v = load_distance_data(o)
+        return sample_dataframes(df_t, df_v, o)
     else:
-        if o.args.data == 'distance':
-            df_t, df_v = load_distance_data(o)
-            return sample_dataframes(df_t, df_v, o)
-        else:
-            df_t, df_v = load_coco_data(o)
-            return sample_dataframes(df_t, df_v, o)
+        df_t, df_v = load_coco_data(o)
+        return sample_dataframes(df_t, df_v, o)
 
 def load_local_data(o):
-    base_path = Path(LOCAL_TEST_DATA_BASE_FOLDER)
+    base_path = Path(LOCAL_TEST_DATA_BASE_DIR)
     df = pd.read_csv('/Users/vskarich/CS230_Scratch_Large/local_data/captions/captions.csv', delimiter=',')
     df.dropna(axis=0, how='any', inplace=True)
     df['image'] = df['image'].map(lambda x:base_path / x.strip())
@@ -162,9 +159,9 @@ def load_local_data(o):
 def load_distance_data(o):
     base_path = Path()
     if o.args.local_mode:
-        base_path = Path(LOCAL_DISTANCE_DATA_LOCATION)
+        base_path = Path(LOCAL_DISTANCE_DATA_DIR)
     else:
-        base_path = Path(REMOTE_DISTANCE_DATA_LOCATION)
+        base_path = Path(REMOTE_DISTANCE_DATA_DIR)
 
 
     df = pd.read_csv(base_path / 'processed_captions.csv', index_col=0)
@@ -181,8 +178,9 @@ def load_distance_data(o):
     return train_df, val_df
 
 def load_coco_data(o):
-    base_path = Path(REMOTE_COCO_DATA_LOCATION)
-    annot = base_path / 'annotations' / 'captions_train2017.json'
+
+    base_path = LOCAL_COCO_DATA_DIR if o.args.local else REMOTE_COCO_DATA_DIR
+    annot = Path(base_path) / 'annotations' / 'captions_train2017.json'
     with open(annot, 'r') as f:
         data = json.load(f)
         data = data['annotations']
@@ -191,11 +189,11 @@ def load_coco_data(o):
 
     for sample in data:
         im = '%012d.jpg' % sample['image_id']
-        samples.append([im, sample['caption']])
+        samples.append([im, sample['caption'], sample['image_id']])
 
-    df = pd.DataFrame(samples, columns=['image', 'caption'])
+    df = pd.DataFrame(samples, columns=['image', 'caption', 'image_id'])
     df['image'] = df['image'].apply(
-        lambda x: base_path / 'train2017' / x
+        lambda x: Path(base_path) / 'train2017' / x
     )
 
     df = df.reset_index(drop=True)
