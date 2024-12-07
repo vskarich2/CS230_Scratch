@@ -36,7 +36,7 @@ def get_args():
 
     parser.add_argument("--distance_word", action='store_true')
 
-    parser.add_argument("--coco_test_count", type=int, default=10)
+    parser.add_argument("--coco_test_count", type=int, default=20)
 
     parser.add_argument("--mode", type=str, default="cross")
 
@@ -193,7 +193,7 @@ if __name__ == "__main__":
                 "valid_size": trainer.o.train_config.valid_size
             }
         )
-        trainer.test_one_epoch()
+        trainer.test_one_epoch(0)
 
 
 
