@@ -7,7 +7,7 @@ from models.cross_attention_model.gpt2_vit_cross_attention import GPT2CrossAtten
 from models.common.gpt2_mlp import GPT2MLP
 
 
-class GPT2Block(nn.Module):
+class GPT2WithCrossAttentionBlock(nn.Module):
     # This is the main block for the model
     def __init__(self, config, args):
         super().__init__()

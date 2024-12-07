@@ -12,7 +12,7 @@ from timm import create_model
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
 
-from models.cross_attention_model.gpt2_vit_transformer import GPT2Block
+from models.cross_attention_model.gpt2_vit_transformer import GPT2WithCrossAttentionBlock
 
 class CrossAttentionModel(nn.Module):
     def __init__(self, o):
@@ -31,7 +31,7 @@ class CrossAttentionModel(nn.Module):
             wte=nn.Embedding(self.m_cnfg.vocab_size, self.m_cnfg.embed_dim),  # This is the token embedding
             wpe=nn.Embedding(self.m_cnfg.seq_len, self.m_cnfg.embed_dim),  # This is the positional embedding
             drop=nn.Dropout(self.m_cnfg.emb_dropout),
-            h=nn.ModuleList([GPT2Block(self.m_cnfg, self.args) for _ in range(self.m_cnfg.depth)]),
+            h=nn.ModuleList([GPT2WithCrossAttentionBlock(self.m_cnfg, self.args) for _ in range(self.m_cnfg.depth)]),
             ln_f=nn.LayerNorm(self.m_cnfg.embed_dim)
         ))
 
@@ -74,7 +74,6 @@ class CrossAttentionModel(nn.Module):
         self.vit_blocks = self.image_encoder.blocks
         print(f'Total combined params: {sum([p.numel() for p in self.parameters() if p.requires_grad])}')
 
-
     def vit_pos_embed(self, x):
         x = torch.cat((self.image_encoder.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
         x = x + self.image_encoder.pos_embed
@@ -102,6 +101,7 @@ class CrossAttentionModel(nn.Module):
         all_params.extend(self.vit_general_params)
         all_params.extend(self.vit_blocks)
 
+        # Note that we do not include the cross attention layer here
         gpt_layers = [[
             self.transformer.h[i].ln_1, self.transformer.h[i].ln_2,
             self.transformer.h[i].attn, self.transformer.h[i].mlp
@@ -128,16 +128,13 @@ class CrossAttentionModel(nn.Module):
 
         blocks_to_unfreeze = sched[epoch] if epoch in sched else []
 
-        pretty_blocks = [x + 1 for x in blocks_to_unfreeze]
-
-        if len(pretty_blocks) > 0:
-            print(f'\nUnfreezing VIT layers: {pretty_blocks}')
+        if len(blocks_to_unfreeze) > 0:
+            print(f'\nUnfreezing VIT layers: {blocks_to_unfreeze}')
 
             for block_num in blocks_to_unfreeze:
                 block = self.vit_blocks[block_num]
-                for layer in block:
-                    for p in layer.parameters():
-                        p.requires_grad = True
+                for p in block.parameters():
+                    p.requires_grad = True
 
     def GPT_unfreeze_layers(self, epoch):
 
