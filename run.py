@@ -5,7 +5,7 @@ import metrics.cider
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
-from metrics.cider import calculate_coco_scores
+#from metrics.cider import calculate_coco_scores
 
 from utils import *
 import wandb
