@@ -63,7 +63,7 @@ class Trainer:
             wandb.init(
                 # set the wandb project where this run will be logged
                 project="CS230_final_project",
-
+                tags=[o.args.mode, o.args.data, ],
                 # track hyperparameters and run metadata
                 config={
                     "name": f"experiment_{o.train_config.model_name}",
@@ -97,7 +97,7 @@ class Trainer:
             valid = self.valid_one_epoch(epoch)
 
             if self.o.args.log_wandb:
-                self.test_one_epoch()
+                self.test_one_epoch(epoch)
 
             self.clean()
 
@@ -112,6 +112,7 @@ class Trainer:
     def log(self, name, value):
         if self.o.args.log_wandb:
             wandb.log({name: value})
+    
     def print_trainable_params(self):
         print(f'Total trainable params: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
 
@@ -182,7 +183,7 @@ class Trainer:
 
 
     @torch.no_grad()
-    def test_one_epoch(self):
+    def test_one_epoch(self, epoch):
         print(f'Running test epoch...')
         columns = ["image_id", "image", "model", "actual"]
         test_table = wandb.Table(columns=columns)
@@ -204,7 +205,7 @@ class Trainer:
                 test_table
             )
 
-        wandb.log({"test_captions": test_table})
+        wandb.log({f"test_captions epoch {epoch} ": test_table})
 
     def log_test_result(
             self,
