@@ -221,7 +221,7 @@ class Trainer:
         torch.cuda.empty_cache()
 
     def save_model(self):
-        if not self.args.local_mode:
+        if not self.args.local:
             self.train_config.model_path.mkdir(exist_ok=True)
             sd = self.model.state_dict()
             print(f'Saving model...{self.model_name}')
