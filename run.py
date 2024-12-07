@@ -93,7 +93,7 @@ def setup(args):
     }
 
     encoder_unfreeze_unified = {
-        0: [10,11],
+        0: [],
         1: [],
         2: [],
         3: [],
