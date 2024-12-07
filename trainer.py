@@ -97,7 +97,7 @@ class Trainer:
             valid = self.valid_one_epoch(epoch)
 
             if self.o.args.log_wandb:
-                self.test_one_epoch(epoch)
+                self.test_one_epoch()
 
             self.clean()
 
