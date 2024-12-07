@@ -5,7 +5,7 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 from metrics.cider import calculate_coco_scores
 
 from utils import *
-
+import wandb
 from constants import LOCAL_MODEL_DIR, REMOTE_MODEL_DIR
 
 import argparse
@@ -38,7 +38,8 @@ def get_args():
 
     parser.add_argument("--infer_count", type=int, default=25)
 
-    parser.add_argument("--coco_test_count", type=int, default=100)
+    parser.add_argument("--coco_test_count", type=int, default=10)
+
     parser.add_argument("--mode", type=str, default="cross")
 
     parser.add_argument("--num_workers", type=int, default=4)
@@ -59,7 +60,6 @@ def get_args():
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-4)
 
-    parser.add_argument("--dry_run", action='store_true')
     parser.add_argument("--log_wandb", action='store_true')
 
     args = parser.parse_args()
@@ -180,6 +180,21 @@ if __name__ == "__main__":
     if args.train:
         trainer.fit()
     else:
+        wandb.init(
+            # set the wandb project where this run will be logged
+            project="CS230_final_project",
+
+            # track hyperparameters and run metadata
+            config={
+                "name": f"experiment_{trainer.o.train_config.model_name}",
+                "learning_rate": 1e-4,
+                "architecture": trainer.o.args.mode,
+                "dataset": trainer.o.args.data,
+                "epochs": trainer.o.train_config.epochs,
+                "train_size": trainer.o.train_config.train_size,
+                "valid_size": trainer.o.train_config.valid_size
+            }
+        )
         trainer.test_one_epoch()
 
 

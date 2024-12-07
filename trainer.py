@@ -96,6 +96,9 @@ class Trainer:
             prog.set_description('validating')
             valid = self.valid_one_epoch(epoch)
 
+            if self.o.args.log_wandb:
+                self.test_one_epoch(epoch)
+
             self.clean()
 
             if valid < best_valid:
@@ -175,42 +178,54 @@ class Trainer:
 
         return val_loss
 
+
+
     @torch.no_grad()
     def test_one_epoch(self):
         print(f'Running test epoch...')
+        columns = ["image_id", "image", "model", "actual"]
+        test_table = wandb.Table(columns=columns)
+
         for i in range(self.o.args.coco_test_count):
             test = self.df_v.sample(n=1).values[0]
-            test_img, test_caption, id = test[0], test[1], test[2]
-            self.compare_captions(
+            test_img, actual_caption, image_id = test[0], test[1], test[2]
+            gen_caption = self.generate_caption(
                 test_img,
-                test_caption,
-                id,
-                self.o.args.sampling_method,
-                self.o.args.temp,
+                temperature=self.o.args.temp,
+                sampling_method=self.o.args.sampling_method
             )
-    def compare_captions(self, test_img, test_caption, id, sampling_method, temp):
-        gen_caption = self.generate_caption(
-            test_img,
-            temperature=temp,
-            sampling_method=sampling_method
-        )
-        result = {}
-        result["image_id"] = id
-        result["actual"] = test_caption
-        result["model"] = gen_caption
 
-        print(result)
+            self.log_test_result(
+                str(test_img),
+                actual_caption,
+                gen_caption,
+                image_id,
+                test_table
+            )
+
+        wandb.log({"test_captions": test_table})
+
+    def log_test_result(
+            self,
+            image,
+            actual_caption,
+            model_caption,
+            img_id,
+            test_table
+    ):
+
+        test_table.add_data(img_id, wandb.Image(image), actual_caption, model_caption)
 
     def clean(self):
         gc.collect()
         torch.cuda.empty_cache()
 
     def save_model(self):
-        #if not self.args.local_mode:
-        self.train_config.model_path.mkdir(exist_ok=True)
-        sd = self.model.state_dict()
-        print(f'Saving model...{self.model_name}')
-        torch.save(sd, self.train_config.model_path / self.model_name)
+        if not self.args.local_mode:
+            self.train_config.model_path.mkdir(exist_ok=True)
+            sd = self.model.state_dict()
+            print(f'Saving model...{self.model_name}')
+            torch.save(sd, self.train_config.model_path / self.model_name)
 
     def load_pretrained_model(self):
         args = self.args
