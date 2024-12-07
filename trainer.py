@@ -63,7 +63,6 @@ class Trainer:
             wandb.init(
                 # set the wandb project where this run will be logged
                 project="CS230_final_project",
-                tags=[o.args.mode, o.args.data, ],
                 # track hyperparameters and run metadata
                 config={
                     "name": f"experiment_{o.train_config.model_name}",
@@ -112,7 +111,7 @@ class Trainer:
     def log(self, name, value):
         if self.o.args.log_wandb:
             wandb.log({name: value})
-    
+
     def print_trainable_params(self):
         print(f'Total trainable params: {sum([p.numel() for p in self.model.parameters() if p.requires_grad])}')
 
