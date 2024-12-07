@@ -26,10 +26,8 @@ def calculate_coco_scores(o):
     # SPICE will take a few minutes the first time, but speeds up due to caching
     coco_eval.evaluate()
 
-    return coco_eval.eval.items()
-
     # print output evaluation scores
-    # for metric, score in coco_eval.eval.items():
-    #     print(f'{metric}: {score:.3f}')
+    for metric, score in coco_eval.eval.items():
+        print(f'{metric}: {score:.3f}')
 
 

@@ -3,7 +3,7 @@ import os
 import warnings
 
 from constants import REMOTE_COCO_RESULTS
-#import metrics.cider
+import metrics.cider
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -189,8 +189,9 @@ class Trainer:
     @torch.no_grad()
     def test_one_epoch(self, epoch):
         print(f'Running test epoch...')
-        columns = ["image_id", "image", "model", "actual"]
-        test_table = wandb.Table(columns=columns)
+        if self.o.args.log_wandb:
+            columns = ["image_id", "image", "model", "actual"]
+            test_table = wandb.Table(columns=columns)
 
         coco_results = []
 
@@ -203,27 +204,25 @@ class Trainer:
                 sampling_method=self.o.args.sampling_method
             )
 
-            self.log_test_result(
-                image=str(test_img),
-                actual_caption=actual_caption,
-                model_caption=gen_caption,
-                img_id=image_id,
-                test_table=test_table
-            )
+            if self.o.args.log_wandb:
+                self.log_test_result(
+                    image=str(test_img),
+                    actual_caption=actual_caption,
+                    model_caption=gen_caption,
+                    img_id=image_id,
+                    test_table=test_table
+                )
 
             coco_result = {
                 "image_id": image_id, "caption": gen_caption
             }
             coco_results.append(coco_result)
 
-        # os.remove(REMOTE_COCO_RESULTS)
-        # with open(REMOTE_COCO_RESULTS, 'w') as f:
-        #     json.dump(coco_results, f)
-        #
-        # items = metrics.cider.calculate_coco_scores(self.o)
-        # # print output evaluation scores
-        # for metric, score in coco_eval.eval.items():
-        #     print(f'{metric}: {score:.3f}')
+        os.remove(REMOTE_COCO_RESULTS)
+        with open(REMOTE_COCO_RESULTS, 'w') as f:
+            json.dump(coco_results, f)
+
+        metrics.cider.calculate_coco_scores(self.o)
 
         wandb.log({f"test_captions epoch {epoch} ": test_table})
 
