@@ -124,9 +124,8 @@ class UnifiedAttentionModel(nn.Module):
 
             for block_num in blocks_to_unfreeze:
                 block = self.vit_blocks[block_num]
-                for layer in block:
-                    for p in layer.parameters():
-                        p.requires_grad = True
+                for p in block.parameters():
+                    p.requires_grad = True
 
     def freeze_all_layers_all_models(self, trainable=False):
 

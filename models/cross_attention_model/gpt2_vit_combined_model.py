@@ -18,7 +18,8 @@ class CrossAttentionModel(nn.Module):
     def __init__(self, o):
         super().__init__()
         self.args = o.args
-        self.config = o.config
+        self.o = o
+        self.m_cnfg = o.model_config
         self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
@@ -188,6 +189,9 @@ class CrossAttentionModel(nn.Module):
 
         for i in range(self.config.depth):
             vit_hidden_state = self.vision_blocks[i](vit_hidden_state)
+
+        # Position Embed image tokens again
+        vit_hidden_state = self.vit_pos_embed(vit_hidden_state)
 
         # Batch Size x max sequence length in batch x 768
         gpt_hidden_state = text_input_embeddings

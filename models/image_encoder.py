@@ -42,9 +42,6 @@ class ImageEncoder(nn.Module):
 
     def forward(self, image):
 
-
-
-
         hidden_state = self.create_image_input(image)
 
         for i in range(self.config.depth):
