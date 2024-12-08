@@ -232,8 +232,7 @@ class Trainer:
         gen = ""
         act = ""
 
-        #for i in range(self.o.args.coco_test_count):
-        for i in range(1):
+        for i in range(self.o.args.coco_test_count):
             test = self.df_v.sample(n=1).values[0]
             test_img, actual_caption, image_id = test[0], test[1], test[2]
             gen_caption = self.generate_caption(
