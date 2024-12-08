@@ -2,8 +2,9 @@ import json
 import os
 import warnings
 
-from constants import REMOTE_COCO_RESULTS
-import metrics.cider
+from bert_score import score
+import statistics
+import sacrebleu
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
@@ -70,6 +71,7 @@ class Trainer:
                 project="CS230_final_project",
                 # track hyperparameters and run metadata
                 config={
+                    "id": o.train_config.model_name,
                     "name": f"experiment_{o.train_config.model_name}",
                     "learning_rate": 1e-4,
                     "architecture": o.args.mode,
@@ -184,18 +186,12 @@ class Trainer:
 
         return val_loss
 
-
-
     @torch.no_grad()
-    def test_one_epoch(self, epoch):
-        print(f'Running test epoch...')
-        if self.o.args.log_wandb:
-            columns = ["image_id", "image", "model", "actual"]
-            test_table = wandb.Table(columns=columns)
-
-        coco_results = []
-
-        for i in range(self.o.args.coco_test_count):
+    def big_test_one_epoch(self, epoch):
+        print(f'Running FINAL test epoch on 1000 examples...')
+        bert_scores = []
+        bleu_scores = []
+        for i in range(1000):
             test = self.df_v.sample(n=1).values[0]
             test_img, actual_caption, image_id = test[0], test[1], test[2]
             gen_caption = self.generate_caption(
@@ -204,27 +200,82 @@ class Trainer:
                 sampling_method=self.o.args.sampling_method
             )
 
+            candidates = [gen_caption]
+            references = [actual_caption]
+
+            P, R, F1 = score(candidates, references, lang="en", verbose=True)
+            bert_score = F1.mean().item()
+            bert_scores.append(bert_score)
+
+            bleu = sacrebleu.corpus_bleu(candidates, [references])
+            bleu_scores.append(bleu.score)
+
+        mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
+        mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
+
+        columns = ["bert", "bleu"]
+        test_table = wandb.Table(columns=columns)
+        wandb.log({f"bert: {mean_bert} bleu: {mean_bleu}": test_table})
+        test_table.add_data(mean_bert, mean_bleu)
+
+    @torch.no_grad()
+    def test_one_epoch(self, epoch):
+
+        print(f'Running test epoch...')
+        if self.o.args.log_wandb:
+            columns = ["image_id", "image", "model", "actual", "F1 BERT score", "BLEU score"]
+            test_table = wandb.Table(columns=columns)
+
+        bert_scores = []
+        bleu_scores = []
+
+        gen = ""
+        act = ""
+
+        #for i in range(self.o.args.coco_test_count):
+        for i in range(1):
+            test = self.df_v.sample(n=1).values[0]
+            test_img, actual_caption, image_id = test[0], test[1], test[2]
+            gen_caption = self.generate_caption(
+                test_img,
+                temperature=self.o.args.temp,
+                sampling_method=self.o.args.sampling_method
+            )
+
+            candidates = [gen_caption]
+            references = [actual_caption]
+
+            gen = gen_caption
+            act = actual_caption
+
+            P, R, F1 = score(candidates, references, lang="en", verbose=True)
+            bert_score = F1.mean().item()
+            bert_scores.append(bert_score)
+
+            bleu = sacrebleu.corpus_bleu(candidates, [references])
+            bleu_scores.append(bleu.score)
+
             if self.o.args.log_wandb:
                 self.log_test_result(
                     image=str(test_img),
                     actual_caption=actual_caption,
                     model_caption=gen_caption,
                     img_id=image_id,
-                    test_table=test_table
+                    test_table=test_table,
+                    bert_score=bert_score,
+                    bleu_score=bleu.score
                 )
 
-        #     coco_result = {
-        #         "image_id": image_id, "caption": gen_caption
-        #     }
-        #     coco_results.append(coco_result)
-        #
-        # os.remove(REMOTE_COCO_RESULTS)
-        # with open(REMOTE_COCO_RESULTS, 'w') as f:
-        #     json.dump(coco_results, f)
+        mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
+        mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-        metrics.cider.calculate_coco_scores(self.o)
         if self.o.args.log_wandb:
-            wandb.log({f"test_captions epoch {epoch} ": test_table})
+            wandb.log({f"epoch: {epoch} bert: {mean_bert} bleu: {mean_bleu}": test_table})
+
+        if self.o.args.local:
+            print(gen)
+            print(act)
+            print(f"epoch: {epoch} bert: {mean_bert} bleu: {mean_bleu}")
 
     def log_test_result(
             self,
@@ -232,9 +283,18 @@ class Trainer:
             actual_caption,
             model_caption,
             img_id,
-            test_table
+            test_table,
+            bert_score,
+            bleu_score
     ):
-        test_table.add_data(img_id, wandb.Image(image), model_caption, actual_caption)
+        test_table.add_data(
+            img_id,
+            wandb.Image(image),
+            model_caption,
+            actual_caption,
+            bert_score,
+            bleu_score
+        )
 
     def clean(self):
         gc.collect()
