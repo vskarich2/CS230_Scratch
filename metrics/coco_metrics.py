@@ -9,6 +9,9 @@ class CocoMetrics(BaseMetrics):
         self.o = o
         self.run = self.create_wandb_logs()
         self.run_table = self.create_run_table()
+        self.ref_image_id = None
+        self.ref_image = None
+        self.ref_image_caption = None
 
     def close_run_table(self):
         wandb.log({f"Metrics Summary": self.run_table})

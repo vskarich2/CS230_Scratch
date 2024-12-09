@@ -1,6 +1,8 @@
 import json
 import os
 import warnings
+from pathlib import PosixPath
+
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from bert_score import score
 import statistics
@@ -32,6 +34,7 @@ from transformers import GPT2TokenizerFast
 from utils import *
 
 class Trainer:
+
     def __init__(self, o):
         self.o = o
         self.args = o.args
@@ -100,7 +103,7 @@ class Trainer:
 
             if self.o.args.test_per_epoch:
                 self.test_one_epoch(epoch)
-                self.big_test_one_epoch(epoch)
+                self.big_test_one_epoch_coco(epoch)
 
             self.clean()
 
@@ -267,8 +270,16 @@ class Trainer:
     @torch.no_grad()
     def big_test_one_epoch_coco(self, epoch):
         def get_reference_image_data():
-            item = self.df_v.loc[self.df_v['image_id'] == '55578']
-            image, actual, id = item[0], item[1], item[2]
+            if self.metrics.ref_image_id == None:
+                item = self.df_v.sample(n=1).values[0]
+                image, actual, id = item[0], item[1], item[2]
+                self.metrics.ref_image_id = id
+                self.metrics.ref_image = image
+                self.metrics.ref_image_caption = actual
+            else:
+                image = self.metrics.ref_image
+                actual = self.metrics.ref_image_caption
+                id = self.metrics.ref_image_id
 
             pred = self.generate_caption(
                 image,
@@ -287,6 +298,8 @@ class Trainer:
 
         for i in range(self.o.args.big_test_count):
             test = self.df_v.sample(n=1).values[0]
+            test_img: PosixPath
+            image_id: int
             test_img, actual_caption, image_id = test[0], test[1], test[2]
             gen_caption = self.generate_caption(
                 test_img,
@@ -313,7 +326,7 @@ class Trainer:
         mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-        def update_run_func(table):
+        def update_run_func(table: wandb.Table):
 
             ref_image_id, ref_image, pred_caption, actual_caption =  get_reference_image_data()
 
@@ -367,7 +380,7 @@ class Trainer:
             bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
             bleu_scores.append(bleu_score)
 
-            def update_func(table):
+            def update_func(table: wandb.Table):
                 table.add_data(
                     image_id,
                     wandb.Image(test_img),

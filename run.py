@@ -219,24 +219,10 @@ if __name__ == "__main__":
     if args.train:
         trainer.fit()
     elif args.big_test:
-        trainer.big_test_one_epoch(1)
+        trainer.big_test_one_epoch_coco(0)
     else:
-        wandb.init(
-            # set the wandb project where this run will be logged
-            project="CS230_final_project",
+        print("No train or test options entered!!")
 
-            # track hyperparameters and run metadata
-            config={
-                "name": f"experiment_{trainer.o.train_config.model_name}",
-                "learning_rate": 1e-4,
-                "architecture": trainer.o.args.mode,
-                "dataset": trainer.o.args.data,
-                "epochs": trainer.o.train_config.epochs,
-                "train_size": trainer.o.train_config.train_size,
-                "valid_size": trainer.o.train_config.valid_size
-            }
-        )
-        trainer.test_one_epoch(0)
 
 
 
