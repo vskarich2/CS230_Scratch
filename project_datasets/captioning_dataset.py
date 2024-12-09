@@ -158,16 +158,16 @@ def load_local_data(o):
 
 def load_distance_data(o):
     base_path = Path()
-    if o.args.local_mode:
+    if o.args.local:
         base_path = Path(LOCAL_DISTANCE_DATA_DIR)
     else:
         base_path = Path(REMOTE_DISTANCE_DATA_DIR)
 
 
-    df = pd.read_csv(base_path / 'processed_captions.csv', index_col=0)
+    df = pd.read_csv(base_path / 'final_captions.tsv', index_col=0, sep='\t')
     df.dropna(axis=0, how='any', inplace=True)
     df['image'] = df['img_url'].map(lambda x: base_path / 'images' / x.strip())
-    caption_col = 'caption_str_2' if o.args.distance_word else 'caption_str_1'
+    caption_col = 'dist_caption'
     df['caption'] = df[caption_col].map(lambda x: x.strip().lower())
     df = df[['image', 'caption']]
 

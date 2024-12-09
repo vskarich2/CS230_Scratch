@@ -40,3 +40,4 @@ def show_image(trainer, test_img, test_caption, sampling_method, temp):
     plt.axis('off')
     plt.show()
 
+

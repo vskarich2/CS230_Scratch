@@ -120,11 +120,16 @@ class CrossAttentionModel(nn.Module):
 
     def VIT_unfreeze_layers(self, epoch):
         self.VIT_unfreeze_general_params()
+        params = (self.o.args.mode, self.o.args.data)
 
-        if self.o.args.mode == 'unified':
+        if params == ('unified', 'coco'):
             sched = self.o.train_config.encoder_unfreeze_unified
-        else:
+        elif params == ('cross', 'coco'):
             sched = self.o.train_config.encoder_unfreeze_cross
+        elif params == ('unified', 'distance'):
+            sched = self.o.train_config.encoder_unfreeze_unified_dist
+        else:
+            sched = self.o.train_config.encoder_unfreeze_cross_dist
 
         blocks_to_unfreeze = sched[epoch] if epoch in sched else []
 
@@ -139,11 +144,16 @@ class CrossAttentionModel(nn.Module):
     def GPT_unfreeze_layers(self, epoch):
 
         self.GPT_unfreeze_general_params()
+        params = (self.o.args.mode, self.o.args.data)
 
-        if self.o.args.mode == 'unified':
+        if params == ('unified', 'coco'):
             sched = self.o.train_config.decoder_unfreeze_unified
-        else:
+        elif params == ('cross', 'coco'):
             sched = self.o.train_config.decoder_unfreeze_cross
+        elif params == ('unified', 'distance'):
+            sched = self.o.train_config.decoder_unfreeze_unified_dist
+        else:
+            sched = self.o.train_config.decoder_unfreeze_cross_dist
 
         blocks_to_unfreeze = sched[epoch] if epoch in sched else []
 

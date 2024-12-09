@@ -12,9 +12,10 @@ class ImageEncoder(nn.Module):
         self.config = o.model_config
 
         print(f'Loading pre-trained vit_base_patch16_224...')
+        pretrained = False if o.args.model_file else True
         vit = create_model(
             'vit_base_patch16_224',
-            pretrained=True,
+            pretrained=pretrained,
             num_classes=0
         )
 

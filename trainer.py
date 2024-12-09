@@ -326,7 +326,7 @@ class Trainer:
         model_file = model_file if model_file else args.model_file
 
         print(f'Loading saved model...{model_file}')
-        print(f'First building pre-trained model...')
+        print(f'First loading model with no weights...')
         # This loads a model with pre-trained GPT and VIT weights
         if args.mode == 'cross':
             self.model = CrossAttentionModel(self.o)

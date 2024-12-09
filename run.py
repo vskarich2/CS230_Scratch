@@ -95,6 +95,14 @@ def setup(args):
         12: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     }
 
+    decoder_unfreeze_unified_dist = {
+        0: [10, 11],
+        1: [10, 11],
+        2: [8, 9, 10, 11],
+        3: [8, 9, 10, 11],
+        4: [8, 9, 10, 11]
+    }
+
     encoder_unfreeze_unified = {
         0: [],
         1: [],
@@ -106,6 +114,14 @@ def setup(args):
         7: [10, 11],
         8: [8, 9, 10, 11],
         9: [8, 9, 10, 11],
+    }
+
+    encoder_unfreeze_unified_dist = {
+        0: [],
+        1: [],
+        2: [10, 11],
+        3: [10, 11],
+        4: [8, 9, 10, 11]
     }
 
     decoder_unfreeze_cross = {
@@ -121,6 +137,14 @@ def setup(args):
         9: [4, 5, 6, 7, 8, 9, 10, 11],
     }
 
+    decoder_unfreeze_cross_dist = {
+        0: [],
+        1: [],
+        2: [10, 11],
+        3: [10, 11],
+        4: [8, 9, 10, 11]
+    }
+
     encoder_unfreeze_cross = {
         0: [],
         1: [],
@@ -133,6 +157,15 @@ def setup(args):
         8: [8, 9, 10, 11],
         9: [8, 9, 10, 11],
     }
+
+    encoder_unfreeze_cross_dist = {
+        0: [],
+        1: [],
+        2: [],
+        3: [10, 11],
+        4: [8, 9, 10, 11]
+    }
+
     model_config = SimpleNamespace(
         vocab_size=50_257,
         embed_dim=768,
@@ -159,7 +192,11 @@ def setup(args):
         encoder_unfreeze_cross=encoder_unfreeze_cross,
         decoder_unfreeze_cross=decoder_unfreeze_cross,
         encoder_unfreeze_unified=encoder_unfreeze_unified,
-        decoder_unfreeze_unified=decoder_unfreeze_unified
+        decoder_unfreeze_unified=decoder_unfreeze_unified,
+        encoder_unfreeze_cross_dist=encoder_unfreeze_cross_dist,
+        decoder_unfreeze_cross_dist=decoder_unfreeze_cross_dist,
+        encoder_unfreeze_unified_dist=encoder_unfreeze_unified_dist,
+        decoder_unfreeze_unified_dist=decoder_unfreeze_unified_dist,
     )
 
     o = SimpleNamespace(
