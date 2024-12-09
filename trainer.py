@@ -106,6 +106,7 @@ class Trainer:
 
             if self.o.args.test_per_epoch:
                 self.test_one_epoch(epoch)
+                self.big_test_one_epoch(epoch)
 
             self.clean()
 
@@ -192,7 +193,7 @@ class Trainer:
         return val_loss
 
     @torch.no_grad()
-    def big_test_one_epoch(self):
+    def big_test_one_epoch(self, epoch):
         dist_map = {'one': 1.0, 'two':2.0, 'three':3.0, 'four':4.0, 'five':5.0, 'six':6.0, 'seven':7.0, 'eight':8.0, 'nine':9.0, 'ten':10.0, 'eleven':11.0,
                     'twelve':12.0, 'thirteen':13.0, 'fourteen':14.0, 'fifteen':15.0}
         def get_data_for_prec_recall(gens, actuals):
@@ -260,12 +261,11 @@ class Trainer:
         metric.update(input, target)
         global_acc = metric.compute()
         test_table_scores.add_data(mean_bert, mean_bleu, global_acc)
-        wandb.log({"Metrics Summary": test_table_scores})
+        wandb.log({f"Metrics Summary Epoch {epoch}": test_table_scores})
 
-
-        wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
-                                                           y_true=ground_truth, preds=predictions,
-                                                           class_names=list(dist_map.keys()))})
+        # wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
+        #                                                    y_true=ground_truth, preds=predictions,
+        #                                                    class_names=list(dist_map.keys()))})
     @torch.no_grad()
     def test_one_epoch(self, epoch):
 
