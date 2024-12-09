@@ -218,8 +218,8 @@ if __name__ == "__main__":
 
     if args.train:
         trainer.fit()
-    elif args.coco_test:
-        trainer.test_one_epoch(1)
+    elif args.big_test:
+        trainer.big_test_one_epoch(1)
     else:
         wandb.init(
             # set the wandb project where this run will be logged

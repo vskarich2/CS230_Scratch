@@ -116,9 +116,6 @@ class Trainer:
 
             print(self.metrics.tail(1))
 
-        if self.o.args.big_test:
-            self.big_test_one_epoch()
-
         return
 
     def log(self, name, value):
@@ -247,13 +244,13 @@ class Trainer:
         test_table_scores = wandb.Table(columns=columns_scores)
 
         predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
-
-        # metric_individual = MulticlassAccuracy(average=None, num_classes=15)
-        # input = torch.tensor(predictions).type(torch.int64)
-        # target = torch.tensor(ground_truth).type(torch.int64)
-        # metric_individual.update(input, target)
-        # individual_acc = metric_individual.compute().tolist()
-        # individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
+        if self.o.args.local:
+            metric_individual = MulticlassAccuracy(average=None, num_classes=15)
+            input = torch.tensor(predictions).type(torch.int64)
+            target = torch.tensor(ground_truth).type(torch.int64)
+            metric_individual.update(input, target)
+            individual_acc = metric_individual.compute().tolist()
+            individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
 
         metric = MulticlassAccuracy(average="macro", num_classes=16)
         input = torch.tensor(predictions).type(torch.int64)
@@ -263,9 +260,10 @@ class Trainer:
         test_table_scores.add_data(mean_bert, mean_bleu, global_acc)
         wandb.log({f"Metrics Summary Epoch {epoch}": test_table_scores})
 
-        # wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
-        #                                                    y_true=ground_truth, preds=predictions,
-        #                                                    class_names=list(dist_map.keys()))})
+        if self.o.args.local:
+            wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
+                                                           y_true=ground_truth, preds=predictions,
+                                                           class_names=list(dist_map.keys()))})
     @torch.no_grad()
     def test_one_epoch(self, epoch):
 
