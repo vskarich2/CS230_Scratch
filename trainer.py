@@ -86,7 +86,7 @@ class Trainer:
 
     def fit(self):
         if self.o.args.log_wandb:
-            self.columns_scores = ["Epoch", "Bert", "Bleu", "Global Accuracy"]
+            self.columns_scores = ["Epoch", "Image_id", "Image", "Predicted Caption", "Actual Caption", "Bert", "Bleu", "Global Accuracy"]
             self.test_table_scores = wandb.Table(columns=self.columns_scores)
 
         best_valid = 1e9
@@ -118,6 +118,9 @@ class Trainer:
                 self.save_model()
 
             print(self.metrics.tail(1))
+
+        if self.o.args.log_wandb:
+            wandb.log({f"Metrics Summary": self.test_table_scores})
 
         return
 
@@ -194,12 +197,19 @@ class Trainer:
 
     @torch.no_grad()
     def big_test_one_epoch(self, epoch):
+        # def log_single_image(df):
+        #     df
+        #     return image_id, image, predicted, actual
+
         dist_map = {'one': 1.0, 'two':2.0, 'three':3.0, 'four':4.0, 'five':5.0, 'six':6.0, 'seven':7.0, 'eight':8.0, 'nine':9.0, 'ten':10.0, 'eleven':11.0,
                     'twelve':12.0, 'thirteen':13.0, 'fourteen':14.0, 'fifteen':15.0}
         def get_data_for_prec_recall(gens, actuals):
             preds = []
             truths = []
             for gen, actual in zip(gens, actuals):
+                if self.o.args.local:
+                    gen = gen + " three meters away."
+                    actual = actual + " four meters away."
                 dist_word_gen = gen.split()[-3:][0]
                 dist_word_actual = actual.split()[-3:][0]
                 if dist_word_gen in dist_map and dist_word_actual in dist_map:
@@ -235,9 +245,12 @@ class Trainer:
             bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
             bleu_scores.append(bleu_score)
 
-        P, R, F1 = score(pred_captions, true_captions, lang="en", verbose=True)
-        bert_score = F1.mean().item()
-        bert_scores.append(bert_score)
+        if not self.o.args.local:
+            P, R, F1 = score(pred_captions, true_captions, lang="en", verbose=True)
+            bert_score = F1.mean().item()
+            bert_scores.append(bert_score)
+        else:
+            bert_score = 0.7829
 
         mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
@@ -245,7 +258,7 @@ class Trainer:
 
         predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
         if self.o.args.local:
-            metric_individual = MulticlassAccuracy(average=None, num_classes=15)
+            metric_individual = MulticlassAccuracy(average=None, num_classes=16)
             input = torch.tensor(predictions).type(torch.int64)
             target = torch.tensor(ground_truth).type(torch.int64)
             metric_individual.update(input, target)
@@ -259,7 +272,6 @@ class Trainer:
         global_acc = metric.compute()
 
         self.test_table_scores.add_data(epoch, mean_bert, mean_bleu, global_acc)
-        wandb.log({f"Metrics Summary": self.test_table_scores})
 
         if self.o.args.local:
             wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
