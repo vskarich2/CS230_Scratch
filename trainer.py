@@ -254,8 +254,8 @@ class Trainer:
         predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
 
         metric_individual = MulticlassAccuracy(average=None, num_classes=16)
-        input = torch.tensor(predictions)
-        target = torch.tensor(ground_truth)
+        input = torch.tensor(predictions).type(torch.int64)
+        target = torch.tensor(ground_truth).type(torch.int64)
         metric_individual.update(input, target)
         individual_acc = metric_individual.compute().tolist()
         individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc[-2:])]
