@@ -5,7 +5,7 @@ class BaseMetrics():
         self.run = self.create_wandb_logs(o)
         self.run_table = self.create_run_table(o)
 
-    def create_wandb_logs(self):
+    def create_wandb_logs(self, o):
         pass
 
     def create_run_table(self):
