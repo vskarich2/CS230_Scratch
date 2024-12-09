@@ -198,7 +198,7 @@ class Trainer:
         def get_data_for_prec_recall(gens, actuals):
             preds = []
             truths = []
-            for gen, actual in zip(gens, actuals):
+            for gen, actual in dict(zip(gens, actuals)):
                 dist_word_gen = gen.split()[-3:]
                 dist_word_actual = actual.split()[-3:]
                 if dist_word_gen in dist_map and dist_word_actual in dist_map:
