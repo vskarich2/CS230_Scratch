@@ -104,7 +104,7 @@ class Trainer:
             prog.set_description('validating')
             valid = self.valid_one_epoch(epoch)
 
-            if self.o.args.log_wandb:
+            if self.o.args.test_per_epoch:
                 self.test_one_epoch(epoch)
 
             self.clean()
