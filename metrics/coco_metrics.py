@@ -47,7 +47,7 @@ class CocoMetrics(BaseMetrics):
                    ]
         self.epoch_table = wandb.Table(columns=columns)
 
-    def create_wandb_logs(self):
+    def create_wandb_logs(self, o):
         run = wandb.init(
             # set the wandb project where this run will be logged
             project="CS230_final_project",
