@@ -85,6 +85,9 @@ class Trainer:
             )
 
     def fit(self):
+        if self.o.args.log_wandb:
+            self.columns_scores = ["Epoch", "Bert", "Bleu", "Global Accuracy"]
+            self.test_table_scores = wandb.Table(columns=self.columns_scores)
 
         best_valid = 1e9
         prog = tqdm(range(self.train_config.epochs))
@@ -198,7 +201,6 @@ class Trainer:
             truths = []
             for gen, actual in zip(gens, actuals):
                 dist_word_gen = gen.split()[-3:][0]
-                print(dist_word_gen)
                 dist_word_actual = actual.split()[-3:][0]
                 if dist_word_gen in dist_map and dist_word_actual in dist_map:
                     preds.append(dist_map[dist_word_gen])
@@ -240,8 +242,6 @@ class Trainer:
         mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-        columns_scores = ["Bert", "Bleu", "Global Accuracy"]
-        test_table_scores = wandb.Table(columns=columns_scores)
 
         predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
         if self.o.args.local:
@@ -257,8 +257,9 @@ class Trainer:
         target = torch.tensor(ground_truth).type(torch.int64)
         metric.update(input, target)
         global_acc = metric.compute()
-        test_table_scores.add_data(mean_bert, mean_bleu, global_acc)
-        wandb.log({f"Metrics Summary Epoch {epoch}": test_table_scores})
+
+        self.test_table_scores.add_data(epoch, mean_bert, mean_bleu, global_acc)
+        wandb.log({f"Metrics Summary": self.test_table_scores})
 
         if self.o.args.local:
             wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
@@ -319,11 +320,6 @@ class Trainer:
 
         if self.o.args.log_wandb:
             wandb.log({f"epoch: {epoch} bert: {mean_bert} bleu: {mean_bleu}": test_table})
-
-        if self.o.args.local:
-            print(gen)
-            print(act)
-            print(f"epoch: {epoch} bert: {mean_bert} bleu: {mean_bleu}")
 
     def log_test_result(
             self,
