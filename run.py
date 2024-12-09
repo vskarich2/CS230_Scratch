@@ -96,11 +96,11 @@ def setup(args):
     }
 
     decoder_unfreeze_unified_dist = {
-        0: [10, 11],
+        0: [11],
         1: [10, 11],
-        2: [8, 9, 10, 11],
-        3: [8, 9, 10, 11],
-        4: [8, 9, 10, 11]
+        2: [10, 11],
+        3: [9, 10, 11],
+        4: [9, 10, 11]
     }
 
     encoder_unfreeze_unified = {
@@ -119,9 +119,9 @@ def setup(args):
     encoder_unfreeze_unified_dist = {
         0: [],
         1: [],
-        2: [10, 11],
+        2: [11],
         3: [10, 11],
-        4: [8, 9, 10, 11]
+        4: [9, 10, 11]
     }
 
     decoder_unfreeze_cross = {
