@@ -210,13 +210,13 @@ class Trainer:
 
 
 
-        print(f'Running FINAL test epoch on 500 examples...')
+        print(f'Running FINAL test epoch on {self.o.args.big_test_count} examples...')
         bert_scores = []
         bleu_scores = []
         pred_captions = []
         true_captions = []
 
-        for i in range(500):
+        for i in range(self.o.args.big_test_count):
             test = self.df_v.sample(n=1).values[0]
             test_img, actual_caption, image_id = test[0], test[1], test[2]
             gen_caption = self.generate_caption(

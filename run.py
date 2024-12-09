@@ -44,6 +44,7 @@ def get_args():
 
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--big_test_count", type=int, default=500)
 
 
     # This is for loading a saved model, specify a file name.
