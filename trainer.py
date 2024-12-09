@@ -194,7 +194,7 @@ class Trainer:
     @torch.no_grad()
     def big_test_one_epoch(self):
         dist_map = {'one': 1.0, 'two':2.0, 'three':3.0, 'four':4.0, 'five':5.0, 'six':6.0, 'seven':7.0, 'eight':8.0, 'nine':9.0, 'ten':10.0, 'eleven':11.0,
-                    'twelve':12.0, 'thirteen':13.0, 'fourteen':14.0, 'fifteen':15.0, 'twenty':20.0}
+                    'twelve':12.0, 'thirteen':13.0, 'fourteen':14.0, 'fifteen':15.0}
         def get_data_for_prec_recall(gens, actuals):
             preds = []
             truths = []
@@ -253,7 +253,7 @@ class Trainer:
 
         predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
 
-        metric_individual = MulticlassAccuracy(average=None, num_classes=16)
+        metric_individual = MulticlassAccuracy(average=None, num_classes=15)
         input = torch.tensor(predictions).type(torch.int64)
         target = torch.tensor(ground_truth).type(torch.int64)
         metric_individual.update(input, target)
@@ -261,7 +261,7 @@ class Trainer:
         individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc[-2:])]
         individual_acc_list.append(f'20: {individual_acc[-1]}')
 
-        metric = MulticlassAccuracy(average="macro", num_classes=16)
+        metric = MulticlassAccuracy(average="macro", num_classes=15)
         input = torch.tensor(predictions).type(torch.int64)
         target = torch.tensor(ground_truth).type(torch.int64)
         metric.update(input, target)
