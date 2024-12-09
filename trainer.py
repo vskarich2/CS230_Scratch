@@ -242,30 +242,26 @@ class Trainer:
         mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-        columns_scores = ["Bert", "Bleu"]
+        columns_scores = ["Bert", "Bleu", "Global Accuracy"]
         test_table_scores = wandb.Table(columns=columns_scores)
-        test_table_scores.add_data(mean_bert, mean_bleu)
-        wandb.log({"Bert and Bleu Summary": test_table_scores})
 
         predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
 
-        metric_individual = MulticlassAccuracy(average=None, num_classes=15)
-        input = torch.tensor(predictions).type(torch.int64)
-        target = torch.tensor(ground_truth).type(torch.int64)
-        metric_individual.update(input, target)
-        individual_acc = metric_individual.compute().tolist()
-        individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
-    
+        # metric_individual = MulticlassAccuracy(average=None, num_classes=15)
+        # input = torch.tensor(predictions).type(torch.int64)
+        # target = torch.tensor(ground_truth).type(torch.int64)
+        # metric_individual.update(input, target)
+        # individual_acc = metric_individual.compute().tolist()
+        # individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
+
         metric = MulticlassAccuracy(average="macro", num_classes=15)
         input = torch.tensor(predictions).type(torch.int64)
         target = torch.tensor(ground_truth).type(torch.int64)
         metric.update(input, target)
         global_acc = metric.compute()
+        test_table_scores.add_data(mean_bert, mean_bleu, global_acc)
+        wandb.log({"Metrics Summary": test_table_scores})
 
-        columns_distance = ["Global Accuracy", "Individual Accuracy"]
-        test_table_distance = wandb.Table(columns=columns_distance)
-        test_table_distance.add_data(global_acc.item(), f'{individual_acc_list}')
-        wandb.log({"Accuracy": test_table_distance})
 
         wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
                                                            y_true=ground_truth, preds=predictions,
