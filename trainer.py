@@ -229,21 +229,17 @@ class Trainer:
             pred_captions.append(gen_caption)
             true_captions.append(actual_caption)
 
-            candidates = [gen_caption]
-            references = [actual_caption]
-
-            P, R, F1 = score(candidates, references, lang="en", verbose=True)
-            bert_score = F1.mean().item()
-            bert_scores.append(bert_score)
-
             smooth_fn = SmoothingFunction().method1  # You can choose other methods as well
 
             # Calculate BLEU score with smoothing
             bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
             bleu_scores.append(bleu_score)
 
+        P, R, F1 = score(pred_captions, true_captions, lang="en", verbose=True)
+        bert_score = F1.mean().item()
+        bert_scores.append(bert_score)
 
-        mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
+        mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
         columns_scores = ["Bert", "Bleu"]
@@ -258,9 +254,8 @@ class Trainer:
         target = torch.tensor(ground_truth).type(torch.int64)
         metric_individual.update(input, target)
         individual_acc = metric_individual.compute().tolist()
-        individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc[-2:])]
-        individual_acc_list.append(f'20: {individual_acc[-1]}')
-
+        individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
+    
         metric = MulticlassAccuracy(average="macro", num_classes=15)
         input = torch.tensor(predictions).type(torch.int64)
         target = torch.tensor(ground_truth).type(torch.int64)
