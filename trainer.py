@@ -1,7 +1,7 @@
 import json
 import os
 import warnings
-
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from bert_score import score
 import statistics
 import sacrebleu
@@ -113,6 +113,9 @@ class Trainer:
 
             print(self.metrics.tail(1))
 
+        if self.o.args.big_test:
+            self.big_test_one_epoch()
+
         return
 
     def log(self, name, value):
@@ -187,11 +190,11 @@ class Trainer:
         return val_loss
 
     @torch.no_grad()
-    def big_test_one_epoch(self, epoch):
-        print(f'Running FINAL test epoch on 1000 examples...')
+    def big_test_one_epoch(self):
+        print(f'Running FINAL test epoch on 500 examples...')
         bert_scores = []
         bleu_scores = []
-        for i in range(1000):
+        for i in range(500):
             test = self.df_v.sample(n=1).values[0]
             test_img, actual_caption, image_id = test[0], test[1], test[2]
             gen_caption = self.generate_caption(
@@ -207,8 +210,11 @@ class Trainer:
             bert_score = F1.mean().item()
             bert_scores.append(bert_score)
 
-            bleu = sacrebleu.corpus_bleu(candidates, [references])
-            bleu_scores.append(bleu.score)
+            smooth_fn = SmoothingFunction().method1  # You can choose other methods as well
+
+            # Calculate BLEU score with smoothing
+            bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
+            bleu_scores.append(bleu_score)
 
         mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
@@ -251,8 +257,11 @@ class Trainer:
             bert_score = F1.mean().item()
             bert_scores.append(bert_score)
 
-            bleu = sacrebleu.corpus_bleu(candidates, [references])
-            bleu_scores.append(bleu.score)
+            smooth_fn = SmoothingFunction().method1  # You can choose other methods as well
+
+            # Calculate BLEU score with smoothing
+            bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
+            bleu_scores.append(bleu_score)
 
             if self.o.args.log_wandb:
                 self.log_test_result(
@@ -262,7 +271,7 @@ class Trainer:
                     img_id=image_id,
                     test_table=test_table,
                     bert_score=bert_score,
-                    bleu_score=bleu.score
+                    bleu_score=bleu_score
                 )
 
         mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
