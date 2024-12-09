@@ -2,10 +2,10 @@ class BaseMetrics():
     # Order is create_table, update_table, log_table
     def __init__(self, o):
         self.o = o
-        self.run = self.create_wandb_logs(o)
+        self.run = self.create_wandb_logs()
         self.run_table = self.create_run_table()
 
-    def create_wandb_logs(self, o):
+    def create_wandb_logs(self):
         pass
 
     def create_run_table(self):
