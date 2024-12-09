@@ -5,6 +5,11 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from bert_score import score
 import statistics
 import sacrebleu
+
+from metrics.base_metrics import BaseMetrics
+from metrics.coco_metrics import CocoMetrics
+from metrics.dist_metrics import DistMetrics
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 from sklearn.metrics import precision_score, recall_score
@@ -33,9 +38,6 @@ class Trainer:
         self.model_name = o.train_config.model_name
         self.train_config = o.train_config
         self.model_config = o.model_config
-
-        self.metrics = pd.DataFrame()
-        self.metrics[['train_loss', 'val_loss']] = None
 
         self.device = self.train_config.device
         self.tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
@@ -67,28 +69,16 @@ class Trainer:
             steps_per_epoch=total_steps
         )
 
-        if o.args.log_wandb:
-            wandb.init(
-                # set the wandb project where this run will be logged
-                project="CS230_final_project",
-                # track hyperparameters and run metadata
-                config={
-                    "id": o.train_config.model_name,
-                    "name": f"experiment_{o.train_config.model_name}",
-                    "learning_rate": 1e-4,
-                    "architecture": o.args.mode,
-                    "dataset": o.args.data,
-                    "epochs": o.train_config.epochs,
-                    "train_size": o.train_config.train_size,
-                    "valid_size": o.train_config.valid_size
-                }
-            )
+        if self.o.args.data == 'coco':
+            self.metrics = CocoMetrics(self.o)
+        elif self.o.args.data == 'dist':
+            self.metrics = DistMetrics(self.o)
+        else:
+            self.metrics = BaseMetrics(self.o)
+
+        self.metrics.create_run_table(o)
 
     def fit(self):
-        if self.o.args.log_wandb:
-            extra = ["Epoch", "Image_id", "Image", "Predicted Caption","Actual Caption"]
-            self.columns_scores = ["Epoch", "Bert", "Bleu", "Global Accuracy"]
-            self.test_table_scores = wandb.Table(columns=self.columns_scores)
 
         best_valid = 1e9
         prog = tqdm(range(self.train_config.epochs))
@@ -118,10 +108,7 @@ class Trainer:
                 best_valid = valid
                 self.save_model()
 
-            print(self.metrics.tail(1))
-
-        if self.o.args.log_wandb:
-            wandb.log({f"Metrics Summary": self.test_table_scores})
+        self.metrics.close_run_table()
 
         return
 
@@ -166,7 +153,6 @@ class Trainer:
             del image, input_ids, labels, loss
 
         train_loss = running_loss / len(self.train_dl)
-        self.metrics.loc[epoch, ['train_loss']] = train_loss
 
         self.log('train_loss', train_loss)
 
@@ -190,17 +176,13 @@ class Trainer:
             del image, input_ids, labels, loss
 
         val_loss = running_loss / len(self.valid_dl)
-        self.metrics.loc[epoch, ['val_loss']] = val_loss
 
         self.log('valid_loss', val_loss)
 
         return val_loss
 
     @torch.no_grad()
-    def big_test_one_epoch(self, epoch):
-        # def log_single_image(df):
-        #     df
-        #     return image_id, image, predicted, actual
+    def big_test_one_epoch_dist(self, epoch):
 
         dist_map = {'one': 1.0, 'two':2.0, 'three':3.0, 'four':4.0, 'five':5.0, 'six':6.0, 'seven':7.0, 'eight':8.0, 'nine':9.0, 'ten':10.0, 'eleven':11.0,
                     'twelve':12.0, 'thirteen':13.0, 'fourteen':14.0, 'fifteen':15.0}
@@ -256,8 +238,8 @@ class Trainer:
         mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-
         predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
+
         if self.o.args.local:
             metric_individual = MulticlassAccuracy(average=None, num_classes=16)
             input = torch.tensor(predictions).type(torch.int64)
@@ -272,19 +254,87 @@ class Trainer:
         metric.update(input, target)
         global_acc = metric.compute()
 
-        self.test_table_scores.add_data(epoch, mean_bert, mean_bleu, global_acc)
+        def update_run_func(table):
+            # Add single image as reference
+            pass
 
-        if self.o.args.local:
-            wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
-                                                           y_true=ground_truth, preds=predictions,
-                                                           class_names=list(dist_map.keys()))})
+        self.metrics.update_run_table(update_run_func)
+
+        # if self.o.args.local:
+        #     wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
+        #                                                    y_true=ground_truth, preds=predictions,
+        #                                                    class_names=list(dist_map.keys()))})
+    @torch.no_grad()
+    def big_test_one_epoch_coco(self, epoch):
+        def get_reference_image_data():
+            item = self.df_v.loc[self.df_v['image_id'] == '55578']
+            image, actual, id = item[0], item[1], item[2]
+
+            pred = self.generate_caption(
+                image,
+                temperature=self.o.args.temp,
+                sampling_method=self.o.args.sampling_method
+            )
+
+            return id, image, pred, actual
+
+
+        print(f'Running FINAL test epoch on {self.o.args.big_test_count} examples...')
+        bert_scores = []
+        bleu_scores = []
+        pred_captions = []
+        true_captions = []
+
+        for i in range(self.o.args.big_test_count):
+            test = self.df_v.sample(n=1).values[0]
+            test_img, actual_caption, image_id = test[0], test[1], test[2]
+            gen_caption = self.generate_caption(
+                test_img,
+                temperature=self.o.args.temp,
+                sampling_method=self.o.args.sampling_method
+            )
+
+            pred_captions.append(gen_caption)
+            true_captions.append(actual_caption)
+
+            smooth_fn = SmoothingFunction().method1  # You can choose other methods as well
+
+            # Calculate BLEU score with smoothing
+            bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
+            bleu_scores.append(bleu_score)
+
+        if not self.o.args.local:
+            P, R, F1 = score(pred_captions, true_captions, lang="en", verbose=True)
+            bert_score = F1.mean().item()
+            bert_scores.append(bert_score)
+        else:
+            bert_score = 0.7829
+
+        mean_bert = "{0:.4g}".format(bert_score)
+        mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
+
+        def update_run_func(table):
+
+            ref_image_id, ref_image, pred_caption, actual_caption =  get_reference_image_data()
+
+            table.add_data(
+                epoch,
+                ref_image_id,
+                ref_image,
+                pred_caption,
+                actual_caption,
+                mean_bert,
+                mean_bleu
+            )
+
+        self.metrics.update_run_table(update_run_func)
+
     @torch.no_grad()
     def test_one_epoch(self, epoch):
+        # This function is for logging individual examples for an epoch
+        self.metrics.create_epoch_table(epoch)
 
         print(f'Running test epoch...')
-        if self.o.args.log_wandb:
-            columns = ["image_id", "image", "model", "actual", "F1 BERT score", "BLEU score"]
-            test_table = wandb.Table(columns=columns)
 
         bert_scores = []
         bleu_scores = []
@@ -317,41 +367,22 @@ class Trainer:
             bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
             bleu_scores.append(bleu_score)
 
-            if self.o.args.log_wandb:
-                self.log_test_result(
-                    image=str(test_img),
-                    actual_caption=actual_caption,
-                    model_caption=gen_caption,
-                    img_id=image_id,
-                    test_table=test_table,
-                    bert_score=bert_score,
-                    bleu_score=bleu_score
+            def update_func(table):
+                table.add_data(
+                    image_id,
+                    wandb.Image(test_img),
+                    gen_caption,
+                    actual_caption,
+                    bert_score,
+                    bleu_score
                 )
 
-        mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
-        mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
+            self.metrics.update_epoch_table(update_func)
 
-        if self.o.args.log_wandb:
-            wandb.log({f"epoch: {epoch} bert: {mean_bert} bleu: {mean_bleu}": test_table})
+        # mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
+        # mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-    def log_test_result(
-            self,
-            image,
-            actual_caption,
-            model_caption,
-            img_id,
-            test_table,
-            bert_score,
-            bleu_score
-    ):
-        test_table.add_data(
-            img_id,
-            wandb.Image(image),
-            model_caption,
-            actual_caption,
-            bert_score,
-            bleu_score
-        )
+        self.metrics.close_epoch_table(epoch)
 
     def clean(self):
         gc.collect()
