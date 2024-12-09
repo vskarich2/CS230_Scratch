@@ -76,7 +76,7 @@ class Trainer:
         else:
             self.metrics = BaseMetrics(self.o)
 
-        self.metrics.create_run_table(o)
+        self.metrics.create_run_table()
 
     def fit(self):
 
