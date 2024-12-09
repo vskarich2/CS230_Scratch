@@ -254,7 +254,7 @@ class Trainer:
         # individual_acc = metric_individual.compute().tolist()
         # individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
 
-        metric = MulticlassAccuracy(average="macro", num_classes=15)
+        metric = MulticlassAccuracy(average="macro", num_classes=16)
         input = torch.tensor(predictions).type(torch.int64)
         target = torch.tensor(ground_truth).type(torch.int64)
         metric.update(input, target)
