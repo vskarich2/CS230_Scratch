@@ -262,8 +262,8 @@ class Trainer:
         individual_acc_list.append(f'20: {individual_acc[-1]}')
 
         metric = MulticlassAccuracy(average="macro", num_classes=16)
-        input = torch.tensor(predictions)
-        target = torch.tensor(ground_truth)
+        input = torch.tensor(predictions).type(torch.int64)
+        target = torch.tensor(ground_truth).type(torch.int64)
         metric.update(input, target)
         global_acc = metric.compute()
 
