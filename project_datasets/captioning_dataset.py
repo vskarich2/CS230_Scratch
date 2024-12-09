@@ -163,13 +163,12 @@ def load_distance_data(o):
     else:
         base_path = Path(REMOTE_DISTANCE_DATA_DIR)
 
-
     df = pd.read_csv(base_path / 'final_captions.tsv', index_col=0, sep='\t')
     df.dropna(axis=0, how='any', inplace=True)
     df['image'] = df['img_url'].map(lambda x: base_path / 'images' / x.strip())
     caption_col = 'dist_caption'
     df['caption'] = df[caption_col].map(lambda x: x.strip().lower())
-    df = df[['image', 'caption']]
+    df = df[['image', 'caption', 'img_url']]
 
     train_df, val_df = train_test_split(df, test_size=0.1)
     train_df.reset_index(drop=True, inplace=True)
