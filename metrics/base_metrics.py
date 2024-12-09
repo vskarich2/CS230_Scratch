@@ -3,7 +3,7 @@ class BaseMetrics():
     def __init__(self, o):
         self.o = o
         self.run = self.create_wandb_logs(o)
-        self.run_table = self.create_run_table(o)
+        self.run_table = self.create_run_table()
 
     def create_wandb_logs(self, o):
         pass
