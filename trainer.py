@@ -7,11 +7,13 @@ import statistics
 import sacrebleu
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
-
+from sklearn.metrics import precision_score, recall_score
 from project_datasets.captioning_dataset import no_aug_tfms
+from torcheval.metrics import MulticlassAccuracy
 from models.cross_attention_model.gpt2_vit_combined_model import CrossAttentionModel
 from models.unified_attention_model.gpt2_unified_model import UnifiedAttentionModel
-
+import torch
+from torchmetrics.classification import Precision, Recall
 import wandb
 from tqdm import tqdm
 
@@ -191,9 +193,29 @@ class Trainer:
 
     @torch.no_grad()
     def big_test_one_epoch(self):
+        dist_map = {'one': 1.0, 'two':2.0, 'three':3.0, 'four':4.0, 'five':5.0, 'six':6.0, 'seven':7.0, 'eight':8.0, 'nine':9.0, 'ten':10.0, 'eleven':11.0,
+                    'twelve':12.0, 'thirteen':13.0, 'fourteen':14.0, 'fifteen':15.0, 'twenty':20.0}
+        def get_data_for_prec_recall(gens, actuals):
+            preds = []
+            truths = []
+            for gen, actual in zip(gens, actuals):
+                dist_word_gen = gen.split()[-3:]
+                dist_word_actual = actual.split()[-3:]
+                if dist_word_gen in dist_map and dist_word_actual in dist_map:
+                    preds.append(dist_map[dist_word_gen])
+                    truths.append(dist_map[dist_word_actual])
+                else:
+                    continue
+            return preds, truths
+
+
+
         print(f'Running FINAL test epoch on 500 examples...')
         bert_scores = []
         bleu_scores = []
+        pred_captions = []
+        true_captions = []
+
         for i in range(500):
             test = self.df_v.sample(n=1).values[0]
             test_img, actual_caption, image_id = test[0], test[1], test[2]
@@ -202,6 +224,9 @@ class Trainer:
                 temperature=self.o.args.temp,
                 sampling_method=self.o.args.sampling_method
             )
+
+            pred_captions.append(gen_caption)
+            true_captions.append(actual_caption)
 
             candidates = [gen_caption]
             references = [actual_caption]
@@ -216,14 +241,42 @@ class Trainer:
             bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
             bleu_scores.append(bleu_score)
 
+
         mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-        columns = ["bert", "bleu"]
-        test_table = wandb.Table(columns=columns)
-        wandb.log({f"bert: {mean_bert} bleu: {mean_bleu}": test_table})
-        test_table.add_data(mean_bert, mean_bleu)
+        columns_scores = ["Bert", "Bleu"]
+        test_table_scores = wandb.Table(columns=columns_scores)
+        test_table_scores.add_data(mean_bert, mean_bleu)
+        wandb.log({"Bert and Bleu Summary": test_table_scores})
 
+        predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
+
+        metric_individual = MulticlassAccuracy(average=None, num_classes=16)
+        input = torch.tensor(predictions)
+        target = torch.tensor(ground_truth)
+        metric_individual.update(input, target)
+        individual_acc = metric_individual.compute().tolist()
+        individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc[-2:])]
+        individual_acc_list.append(f'20: {individual_acc[-1]}')
+
+        metric = MulticlassAccuracy(average="macro", num_classes=16)
+        input = torch.tensor(predictions)
+        target = torch.tensor(ground_truth)
+        metric.update(input, target)
+        global_acc = metric.compute()
+
+        columns_distance = ["Global Accuracy", "Individual Accuracy"]
+        test_table_distance = wandb.Table(columns=columns_distance)
+        test_table_distance.add_data(global_acc.item(), f'{individual_acc_list}')
+        wandb.log({"Accuracy": test_table_distance})
+
+        wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
+                                                           y_true=ground_truth, preds=predictions,
+                                                           class_names=dist_map.keys())})
+
+
+if __name__ == "__main__":
     @torch.no_grad()
     def test_one_epoch(self, epoch):
 
