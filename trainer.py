@@ -86,7 +86,8 @@ class Trainer:
 
     def fit(self):
         if self.o.args.log_wandb:
-            self.columns_scores = ["Epoch", "Image_id", "Image", "Predicted Caption", "Actual Caption", "Bert", "Bleu", "Global Accuracy"]
+            extra = ["Epoch", "Image_id", "Image", "Predicted Caption","Actual Caption"]
+            self.columns_scores = ["Epoch", "Bert", "Bleu", "Global Accuracy"]
             self.test_table_scores = wandb.Table(columns=self.columns_scores)
 
         best_valid = 1e9
