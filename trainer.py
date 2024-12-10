@@ -302,7 +302,7 @@ class Trainer:
             bleu_scores.append(bleu_score)
 
         if not self.o.args.local:
-            P, R, F1 = score(pred_captions, true_captions, lang="en", verbose=True)
+            P, R, F1 = score(pred_captions, true_captions, lang="en")
             bert_score = F1.mean().item()
             bert_scores.append(bert_score)
         else:
@@ -340,7 +340,7 @@ class Trainer:
             candidates = [gen_caption]
             references = [actual_caption]
 
-            P, R, F1 = score(candidates, references, lang="en", verbose=True)
+            P, R, F1 = score(candidates, references, lang="en")
             bert_score = F1.mean().item()
             bert_scores.append(bert_score)
 
