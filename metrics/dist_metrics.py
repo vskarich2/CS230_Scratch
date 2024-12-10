@@ -41,7 +41,7 @@ class DistMetrics():
             mean_bert,
             mean_bleu,
             total_acc,
-            str(individual_acc)
+            ",".join(individual_acc)
         )
 
     def update_epoch_table(self,
