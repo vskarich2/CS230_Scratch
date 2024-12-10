@@ -84,9 +84,7 @@ class DistMetrics():
                    "Predicted Caption",
                    "Actual Caption",
                    "BERT score (F1)",
-                   "BLEU score",
-                   "Overall Accuracy",
-                   "Individual Accuracy"
+                   "BLEU score"
                    ]
         self.epoch_table = wandb.Table(columns=columns)
 
