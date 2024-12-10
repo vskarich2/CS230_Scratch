@@ -1,11 +1,10 @@
 import wandb
 
-from metrics.base_metrics import BaseMetrics
 
 
-class CocoMetrics(BaseMetrics):
+class CocoMetrics():
     def __init__(self, o):
-        super().__init__(o)
+
         self.o = o
         self.run = self.create_wandb_logs()
         self.run_table = self.create_run_table()
@@ -38,7 +37,7 @@ class CocoMetrics(BaseMetrics):
             "F1 BERT score",
             "BLEU score"
         ]
-        return wandb.Table(columns=columns)
+        wandb.Table(columns=columns)
 
     def create_epoch_table(self, epoch):
         columns = ["Image_id",

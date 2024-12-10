@@ -1,34 +1,25 @@
-import json
-import os
+import statistics
 import warnings
 from pathlib import PosixPath
 
-from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from bert_score import score
-import statistics
-import sacrebleu
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
-from metrics.base_metrics import BaseMetrics
 from metrics.coco_metrics import CocoMetrics
 from metrics.dist_metrics import DistMetrics
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
-from sklearn.metrics import precision_score, recall_score
 from project_datasets.captioning_dataset import no_aug_tfms
 from torcheval.metrics import MulticlassAccuracy
 from models.cross_attention_model.gpt2_vit_combined_model import CrossAttentionModel
 from models.unified_attention_model.gpt2_unified_model import UnifiedAttentionModel
-import torch
-from torchmetrics.classification import Precision, Recall
 import wandb
 from tqdm import tqdm
 
 from project_datasets import captioning_dataset as ds
-import pandas as pd
 import gc
 import PIL.Image
-import numpy as np
 from torch.cuda.amp import GradScaler, autocast
 from transformers import GPT2TokenizerFast
 from utils import *
@@ -74,10 +65,8 @@ class Trainer:
 
         if self.o.args.data == 'coco':
             self.metrics = CocoMetrics(self.o)
-        elif self.o.args.data == 'dist':
-            self.metrics = DistMetrics(self.o)
         else:
-            self.metrics = BaseMetrics(self.o)
+            self.metrics = DistMetrics(self.o)
 
         self.metrics.create_run_table()
 
@@ -262,11 +251,9 @@ class Trainer:
             pass
 
         self.metrics.update_run_table(update_run_func)
+        if not self.o.args.train:
+            self.metrics.close_run_table()
 
-        # if self.o.args.local:
-        #     wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,
-        #                                                    y_true=ground_truth, preds=predictions,
-        #                                                    class_names=list(dist_map.keys()))})
     @torch.no_grad()
     def big_test_one_epoch_coco(self, epoch):
         def get_reference_image_data():
@@ -307,6 +294,8 @@ class Trainer:
                 sampling_method=self.o.args.sampling_method
             )
 
+
+
             pred_captions.append(gen_caption)
             true_captions.append(actual_caption)
 
@@ -328,19 +317,21 @@ class Trainer:
 
         def update_run_func(table: wandb.Table):
 
-            ref_image_id, ref_image, pred_caption, actual_caption =  get_reference_image_data()
+            id, image, pred, actual = get_reference_image_data()
 
             table.add_data(
                 epoch,
-                ref_image_id,
-                ref_image,
-                pred_caption,
-                actual_caption,
+                id,
+                image,
+                pred,
+                actual,
                 mean_bert,
                 mean_bleu
             )
 
         self.metrics.update_run_table(update_run_func)
+        if not self.o.args.train:
+            self.metrics.close_run_table()()
 
     @torch.no_grad()
     def test_one_epoch(self, epoch):
