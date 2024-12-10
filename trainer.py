@@ -63,12 +63,10 @@ class Trainer:
             steps_per_epoch=total_steps
         )
 
-        #if self.o.args.data == 'coco':
-        self.metrics = CocoMetrics(self.o)
-        #else:
-           # self.metrics = DistMetrics(self.o)
-
-        self.metrics.create_run_table()
+        if self.o.args.data == 'coco':
+            self.metrics = CocoMetrics(self.o)
+        else:
+            self.metrics = DistMetrics(self.o)
 
     def fit(self):
 
@@ -90,7 +88,10 @@ class Trainer:
             prog.set_description('validating')
             valid = self.valid_one_epoch(epoch)
 
-            if self.o.args.test_per_epoch:
+            if self.o.args.data == 'dist':
+                self.test_one_epoch_dist(epoch)
+                self.big_test_one_epoch_dist(epoch)
+            else:
                 self.test_one_epoch_coco(epoch)
                 self.big_test_one_epoch_coco(epoch)
 
@@ -174,106 +175,32 @@ class Trainer:
         return val_loss
 
     @torch.no_grad()
-    def big_test_one_epoch_dist(self, epoch):
+    def get_data_for_prec_recall(self,
+            gens: list[str],
+            actuals: list[str]) -> tuple[list[float], list[float]]:
 
-        dist_map = {'one': 1.0, 'two':2.0, 'three':3.0, 'four':4.0, 'five':5.0, 'six':6.0, 'seven':7.0, 'eight':8.0, 'nine':9.0, 'ten':10.0, 'eleven':11.0,
-                    'twelve':12.0, 'thirteen':13.0, 'fourteen':14.0, 'fifteen':15.0}
-        def get_data_for_prec_recall(gens, actuals):
-            preds = []
-            truths = []
-            for gen, actual in zip(gens, actuals):
-                if self.o.args.local:
-                    gen = gen + " three meters away."
-                    actual = actual + " four meters away."
-                dist_word_gen = gen.split()[-3:][0]
-                dist_word_actual = actual.split()[-3:][0]
+        dist_map = {'one': 1.0, 'two': 2.0, 'three': 3.0, 'four': 4.0, 'five': 5.0, 'six': 6.0, 'seven': 7.0,
+                    'eight': 8.0, 'nine': 9.0, 'ten': 10.0, 'eleven': 11.0,
+                    'twelve': 12.0, 'thirteen': 13.0, 'fourteen': 14.0, 'fifteen': 15.0}
 
-                if dist_word_gen in dist_map and dist_word_actual in dist_map:
-                    preds.append(dist_map[dist_word_gen])
-                    truths.append(dist_map[dist_word_actual])
-                else:
-                    continue
-            return preds, truths
+        preds = []
+        truths = []
+        for gen, actual in zip(gens, actuals):
+            if self.o.args.local:
+                gen = gen + " three meters away."
+                actual = actual + " four meters away."
+            dist_word_gen = gen.split()[-3:][0]
+            dist_word_actual = actual.split()[-3:][0]
 
+            if dist_word_gen in dist_map and dist_word_actual in dist_map:
+                preds.append(dist_map[dist_word_gen])
+                truths.append(dist_map[dist_word_actual])
+            else:
+                continue
 
+        return preds, truths
 
-        print(f'Running FINAL test epoch on {self.o.args.big_test_count} examples...')
-        bert_scores = []
-        bleu_scores = []
-        pred_captions = []
-        true_captions = []
-
-        for i in range(self.o.args.big_test_count):
-            test = self.df_v.sample(n=1).values[0]
-            test_img, actual_caption, image_id = test[0], test[1], test[2]
-            gen_caption = self.generate_caption(
-                test_img,
-                temperature=self.o.args.temp,
-                sampling_method=self.o.args.sampling_method
-            )
-
-            pred_captions.append(gen_caption)
-            true_captions.append(actual_caption)
-
-            smooth_fn = SmoothingFunction().method1  # You can choose other methods as well
-
-            # Calculate BLEU score with smoothing
-            bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
-            bleu_scores.append(bleu_score)
-
-        if not self.o.args.local:
-            P, R, F1 = score(pred_captions, true_captions, lang="en", verbose=True)
-            bert_score = F1.mean().item()
-            bert_scores.append(bert_score)
-        else:
-            bert_score = 0.7829
-
-        mean_bert = "{0:.4g}".format(bert_score)
-        mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
-
-        predictions, ground_truth = get_data_for_prec_recall(pred_captions, true_captions)
-
-        if self.o.args.local:
-            metric_individual = MulticlassAccuracy(average=None, num_classes=16)
-            input = torch.tensor(predictions).type(torch.int64)
-            target = torch.tensor(ground_truth).type(torch.int64)
-            metric_individual.update(input, target)
-            individual_acc = metric_individual.compute().tolist()
-            individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
-
-        metric = MulticlassAccuracy(average="macro", num_classes=16)
-        input = torch.tensor(predictions).type(torch.int64)
-        target = torch.tensor(ground_truth).type(torch.int64)
-        metric.update(input, target)
-        global_acc = metric.compute()
-
-        self.metrics.update_run_table()
-        if not self.o.args.train:
-            self.metrics.close_run_table()
-
-    @torch.no_grad()
-    def get_reference_image_data(self):
-        if self.metrics.ref_image_id == None:
-            item = self.df_v.sample(n=1).values[0]
-            image, actual, id = item[0], item[1], item[2]
-            self.metrics.ref_image_id = id
-            self.metrics.ref_image = image
-            self.metrics.ref_image_caption = actual
-        else:
-            image = self.metrics.ref_image
-            actual = self.metrics.ref_image_caption
-            id = self.metrics.ref_image_id
-
-        pred = self.generate_caption(
-            image,
-            temperature=self.o.args.temp,
-            sampling_method=self.o.args.sampling_method
-        )
-
-        return id, image, pred, actual
-
-    def big_test_one_epoch_coco(self, epoch):
-        # This function is for writing run-level, a row for each epoch, to wandb
+    def get_big_bert_bleu(self):
         print(f'Running FINAL test epoch on {self.o.args.big_test_count} examples...')
         bert_scores = []
         bleu_scores = []
@@ -311,23 +238,89 @@ class Trainer:
         mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
+        return mean_bert, mean_bleu, pred_captions, true_captions
+
+    def big_test_one_epoch_coco(self, epoch):
+        # This function is for writing run-level, a row for each epoch, to wandb
+
+        mean_bert, mean_bleu, pred_captions, true_captions = self.get_big_bert_bleu()
         id, image, pred, actual = self.get_reference_image_data()
+
         self.metrics.update_run_table(epoch, id, image, pred, actual, mean_bert, mean_bleu)
 
         if not self.o.args.train:
             self.metrics.close_run_table()
 
+    def big_test_one_epoch_dist(self, epoch):
+        # This function is for writing run-level, a row for each epoch, to wandb
+
+        mean_bert, mean_bleu, pred_captions, true_captions = self.get_big_bert_bleu()
+
+        predictions, labels = self.get_data_for_prec_recall(pred_captions, true_captions)
+        id, image, pred, actual = self.get_reference_image_data()
+        total_acc, individual_acc = self.get_dist_accuracies(predictions, labels)
+
+        self.metrics.update_run_table(
+            epoch,
+            id,
+            image,
+            pred,
+            actual,
+            mean_bert,
+            mean_bleu,
+            total_acc,
+            individual_acc
+        )
+
+        if not self.o.args.train:
+            self.metrics.close_run_table()
+    def get_dist_accuracies(self, predictions, labels):
+
+        metric_individual = MulticlassAccuracy(average=None, num_classes=15)
+        input = torch.tensor(predictions).type(torch.int64)
+        target = torch.tensor(labels).type(torch.int64)
+        metric_individual.update(input, target)
+        individual_acc = metric_individual.compute().tolist()
+        individual_acc_list = [f'{i}: {acc}' for i, acc in enumerate(individual_acc)]
+
+        metric = MulticlassAccuracy(average="macro", num_classes=15)
+        input = torch.tensor(predictions).type(torch.int64)
+        target = torch.tensor(labels).type(torch.int64)
+        metric.update(input, target)
+        global_acc = metric.compute()
+        individual_acc_list = [k for k in individual_acc_list if 'nan' not in k]
+        return global_acc, individual_acc_list
+
+    @torch.no_grad()
+    def get_reference_image_data(self):
+        if self.metrics.ref_image_id == None:
+            item = self.df_v.sample(n=1).values[0]
+            image, actual, id = item[0], item[1], item[2]
+            self.metrics.ref_image_id = id
+            self.metrics.ref_image = image
+            self.metrics.ref_image_caption = actual
+        else:
+            image = self.metrics.ref_image
+            actual = self.metrics.ref_image_caption
+            id = self.metrics.ref_image_id
+
+        pred = self.generate_caption(
+            image,
+            temperature=self.o.args.temp,
+            sampling_method=self.o.args.sampling_method
+        )
+
+        return id, image, pred, actual
+
     @torch.no_grad()
     def test_one_epoch_coco(self, epoch):
-        # This function is for logging individual examples for an epoch.
+        # This function is for logging individual examples for an epoch for visualization.
         # Open and close the table in this function.
         self.metrics.create_epoch_table(epoch)
 
         print(f'Running test epoch...')
 
-        bert_scores = []
-        bleu_scores = []
-
+        # Table is updated every iteration of the loop
         for i in range(self.o.args.coco_test_count):
             test = self.df_v.sample(n=1).values[0]
             test_img, actual_caption, image_id = test[0], test[1], test[2]
@@ -340,15 +333,13 @@ class Trainer:
             candidates = [gen_caption]
             references = [actual_caption]
 
+            # Calculate Bert
             P, R, F1 = score(candidates, references, lang="en")
             bert_score = F1.mean().item()
-            bert_scores.append(bert_score)
 
-            smooth_fn = SmoothingFunction().method1  # You can choose other methods as well
-
-            # Calculate BLEU score with smoothing
+            # Calculate Bleu score with smoothing
+            smooth_fn = SmoothingFunction().method1
             bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
-            bleu_scores.append(bleu_score)
 
             self.metrics.update_epoch_table(
                 image_id,
@@ -359,8 +350,46 @@ class Trainer:
                 bleu_score
             )
 
-        # mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
-        # mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
+        self.metrics.close_epoch_table(epoch)
+
+    @torch.no_grad()
+    def test_one_epoch_dist(self, epoch):
+        # This function is for logging individual examples for an epoch for visualization.
+        # Open and close the table in this function.
+        self.metrics.create_epoch_table(epoch)
+
+        print(f'Running test epoch...')
+
+        # Table is updated every iteration of the loop
+        for i in range(self.o.args.coco_test_count):
+            test = self.df_v.sample(n=1).values[0]
+            test_img, actual_caption, image_id = test[0], test[1], test[2]
+            gen_caption = self.generate_caption(
+                test_img,
+                temperature=self.o.args.temp,
+                sampling_method=self.o.args.sampling_method
+            )
+
+            candidates = [gen_caption]
+            references = [actual_caption]
+
+            # Calculate Bert
+            P, R, F1 = score(candidates, references, lang="en")
+            bert_score = F1.mean().item()
+
+            # Calculate Bleu score with smoothing
+            smooth_fn = SmoothingFunction().method1
+            bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
+
+
+            self.metrics.update_epoch_table(
+                image_id,
+                test_img,
+                gen_caption,
+                actual_caption,
+                bert_score,
+                bleu_score
+            )
 
         self.metrics.close_epoch_table(epoch)
 

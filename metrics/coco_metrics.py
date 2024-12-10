@@ -75,7 +75,7 @@ class CocoMetrics():
                    "Image",
                    "Predicted Caption",
                    "Actual Caption",
-                   "F1 BERT score",
+                   "BERT score (F1)",
                    "BLEU score"
                    ]
         self.epoch_table = wandb.Table(columns=columns)

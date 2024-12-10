@@ -219,7 +219,7 @@ if __name__ == "__main__":
     if args.train:
         trainer.fit()
     elif args.big_test:
-        trainer.big_test_one_epoch_coco(0)
+        trainer.big_test_one_epoch_dist(0)
     else:
         print("No train or test options entered!!")
 
