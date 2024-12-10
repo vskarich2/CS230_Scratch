@@ -88,7 +88,7 @@ class Trainer:
             prog.set_description('validating')
             valid = self.valid_one_epoch(epoch)
 
-            if self.o.args.data == 'dist':
+            if self.o.args.data == 'distance':
                 self.test_one_epoch_dist(epoch)
                 self.big_test_one_epoch_dist(epoch)
             else:
