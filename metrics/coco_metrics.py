@@ -18,11 +18,42 @@ class CocoMetrics():
     def close_epoch_table(self, epoch):
         wandb.log({f"Epoch: {epoch}": self.epoch_table})
 
-    def update_run_table(self, func):
-        func(self.run_table)
+    def update_run_table(self,
+            epoch,
+            id,
+            image,
+            pred,
+            actual,
+            mean_bert,
+            mean_bleu):
 
-    def update_epoch_table(self, func):
-        func(self.epoch_table)
+        self.run_table.add_data(
+            epoch,
+            id,
+            wandb.Image(str(image)),
+            pred,
+            actual,
+            mean_bert,
+            mean_bleu
+        )
+
+    def update_epoch_table(self,
+                    image_id,
+                    image,
+                    gen_caption,
+                    actual_caption,
+                    bert_score,
+                    bleu_score):
+
+        self.epoch_table.add_data(
+                            image_id,
+                            wandb.Image(str(image)),
+                            gen_caption,
+                            actual_caption,
+                            bert_score,
+                            bleu_score)
+
+
 
     def plot_confusion_matrix(self):
         pass
@@ -34,10 +65,10 @@ class CocoMetrics():
             "Image",
             "Predicted Caption",
             "Actual Caption",
-            "F1 BERT score",
+            "BERT score (F1)",
             "BLEU score"
         ]
-        wandb.Table(columns=columns)
+        return wandb.Table(columns=columns)
 
     def create_epoch_table(self, epoch):
         columns = ["Image_id",

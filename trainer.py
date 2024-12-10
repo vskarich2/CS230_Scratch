@@ -63,10 +63,10 @@ class Trainer:
             steps_per_epoch=total_steps
         )
 
-        if self.o.args.data == 'coco':
-            self.metrics = CocoMetrics(self.o)
-        else:
-            self.metrics = DistMetrics(self.o)
+        #if self.o.args.data == 'coco':
+        self.metrics = CocoMetrics(self.o)
+        #else:
+           # self.metrics = DistMetrics(self.o)
 
         self.metrics.create_run_table()
 
@@ -91,7 +91,7 @@ class Trainer:
             valid = self.valid_one_epoch(epoch)
 
             if self.o.args.test_per_epoch:
-                self.test_one_epoch(epoch)
+                self.test_one_epoch_coco(epoch)
                 self.big_test_one_epoch_coco(epoch)
 
             self.clean()
@@ -187,6 +187,7 @@ class Trainer:
                     actual = actual + " four meters away."
                 dist_word_gen = gen.split()[-3:][0]
                 dist_word_actual = actual.split()[-3:][0]
+
                 if dist_word_gen in dist_map and dist_word_actual in dist_map:
                     preds.append(dist_map[dist_word_gen])
                     truths.append(dist_map[dist_word_actual])
@@ -246,37 +247,33 @@ class Trainer:
         metric.update(input, target)
         global_acc = metric.compute()
 
-        def update_run_func(table):
-            # Add single image as reference
-            pass
-
-        self.metrics.update_run_table(update_run_func)
+        self.metrics.update_run_table()
         if not self.o.args.train:
             self.metrics.close_run_table()
 
     @torch.no_grad()
+    def get_reference_image_data(self):
+        if self.metrics.ref_image_id == None:
+            item = self.df_v.sample(n=1).values[0]
+            image, actual, id = item[0], item[1], item[2]
+            self.metrics.ref_image_id = id
+            self.metrics.ref_image = image
+            self.metrics.ref_image_caption = actual
+        else:
+            image = self.metrics.ref_image
+            actual = self.metrics.ref_image_caption
+            id = self.metrics.ref_image_id
+
+        pred = self.generate_caption(
+            image,
+            temperature=self.o.args.temp,
+            sampling_method=self.o.args.sampling_method
+        )
+
+        return id, image, pred, actual
+
     def big_test_one_epoch_coco(self, epoch):
-        def get_reference_image_data():
-            if self.metrics.ref_image_id == None:
-                item = self.df_v.sample(n=1).values[0]
-                image, actual, id = item[0], item[1], item[2]
-                self.metrics.ref_image_id = id
-                self.metrics.ref_image = image
-                self.metrics.ref_image_caption = actual
-            else:
-                image = self.metrics.ref_image
-                actual = self.metrics.ref_image_caption
-                id = self.metrics.ref_image_id
-
-            pred = self.generate_caption(
-                image,
-                temperature=self.o.args.temp,
-                sampling_method=self.o.args.sampling_method
-            )
-
-            return id, image, pred, actual
-
-
+        # This function is for writing run-level, a row for each epoch, to wandb
         print(f'Running FINAL test epoch on {self.o.args.big_test_count} examples...')
         bert_scores = []
         bleu_scores = []
@@ -288,13 +285,12 @@ class Trainer:
             test_img: PosixPath
             image_id: int
             test_img, actual_caption, image_id = test[0], test[1], test[2]
+
             gen_caption = self.generate_caption(
                 test_img,
                 temperature=self.o.args.temp,
                 sampling_method=self.o.args.sampling_method
             )
-
-
 
             pred_captions.append(gen_caption)
             true_captions.append(actual_caption)
@@ -315,36 +311,22 @@ class Trainer:
         mean_bert = "{0:.4g}".format(bert_score)
         mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
 
-        def update_run_func(table: wandb.Table):
+        id, image, pred, actual = self.get_reference_image_data()
+        self.metrics.update_run_table(epoch, id, image, pred, actual, mean_bert, mean_bleu)
 
-            id, image, pred, actual = get_reference_image_data()
-
-            table.add_data(
-                epoch,
-                id,
-                image,
-                pred,
-                actual,
-                mean_bert,
-                mean_bleu
-            )
-
-        self.metrics.update_run_table(update_run_func)
         if not self.o.args.train:
-            self.metrics.close_run_table()()
+            self.metrics.close_run_table()
 
     @torch.no_grad()
-    def test_one_epoch(self, epoch):
-        # This function is for logging individual examples for an epoch
+    def test_one_epoch_coco(self, epoch):
+        # This function is for logging individual examples for an epoch.
+        # Open and close the table in this function.
         self.metrics.create_epoch_table(epoch)
 
         print(f'Running test epoch...')
 
         bert_scores = []
         bleu_scores = []
-
-        gen = ""
-        act = ""
 
         for i in range(self.o.args.coco_test_count):
             test = self.df_v.sample(n=1).values[0]
@@ -358,9 +340,6 @@ class Trainer:
             candidates = [gen_caption]
             references = [actual_caption]
 
-            gen = gen_caption
-            act = actual_caption
-
             P, R, F1 = score(candidates, references, lang="en", verbose=True)
             bert_score = F1.mean().item()
             bert_scores.append(bert_score)
@@ -371,17 +350,14 @@ class Trainer:
             bleu_score = sentence_bleu([actual_caption.split()], gen_caption.split(), smoothing_function=smooth_fn)
             bleu_scores.append(bleu_score)
 
-            def update_func(table: wandb.Table):
-                table.add_data(
-                    image_id,
-                    wandb.Image(test_img),
-                    gen_caption,
-                    actual_caption,
-                    bert_score,
-                    bleu_score
-                )
-
-            self.metrics.update_epoch_table(update_func)
+            self.metrics.update_epoch_table(
+                image_id,
+                test_img,
+                gen_caption,
+                actual_caption,
+                bert_score,
+                bleu_score
+            )
 
         # mean_bert = "{0:.4g}".format(statistics.mean(bert_scores))
         # mean_bleu = "{0:.4g}".format(statistics.mean(bleu_scores))
