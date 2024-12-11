@@ -9,14 +9,44 @@ class DistMetrics():
         self.ref_image_id = None
         self.ref_image = None
         self.ref_image_caption = None
+        self.labeled_distances = None
+        self.pred_distances = None
 
     def close_run_table(self):
         wandb.log({f"Metrics Summary": self.run_table})
-    def create_histogram(self, preds):
 
-        all_examples = list(pd.read_csv('data_utils/distance_captions.tsv', delimiter='\t')['distance'])
-        hist_preds = wandb.Histogram([preds])
-        hist_dataset = wandb.Histogram([all_examples])
+    def create_preds_histogram(self):
+        hist_data = [[] for _ in range(21)]
+
+        # Put data in list of lists format for wandb histogram
+        [hist_data[int(d)].extend([int(d)]) for d in self.pred_distances if d < 21.0]
+        # Filter empty lists
+        col = [l for l in hist_data if len(l) > 0]
+        col_name = "distances"
+
+        table = wandb.Table(data=col, columns=[col_name])
+        wandb.log({'distance_preds': wandb.plot.histogram(table, col_name,
+                                                           title="Distances in Predictions")})
+
+    def save_pred_data(self, preds):
+        self.pred_distances = preds
+
+    def create_labels_histogram(self):
+        file = 'data_utils/distance_captions.tsv'
+        df = pd.read_csv(file, delimiter='\t')
+        df.dropna(axis=0, how='any', inplace=True)
+        labels = list(df['distance'])
+        self.labeled_distances = labels
+        hist_data = [[] for _ in range(21)]
+
+        # Put data in list of lists format for wandb histogram
+        [hist_data[int(d)].extend([int(d)]) for d in labels if d < 21.0]
+        # Filter empty lists
+        col = [l for l in hist_data if len(l) > 0]
+        col_name = "distances"
+        table = wandb.Table(data=col, columns=[col_name])
+        wandb.log({'distance_labels': wandb.plot.histogram(table, col_name,
+                                                           title="Distances in Labeled Data")})
 
     def close_epoch_table(self, epoch):
         wandb.log({f"Epoch: {epoch}": self.epoch_table})

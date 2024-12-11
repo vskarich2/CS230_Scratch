@@ -36,7 +36,7 @@ def get_args():
     parser.add_argument("--unfreeze_gpt", action='store_true')
     parser.add_argument("--unfreeze_vit", action='store_true')
 
-    parser.add_argument("--distance_word", action='store_true')
+    parser.add_argument("--make_histograms", action='store_true')
 
     parser.add_argument("--coco_test_count", type=int, default=20)
 
@@ -218,6 +218,8 @@ if __name__ == "__main__":
 
     if args.train:
         trainer.fit()
+    elif args.make_histograms:
+        trainer.big_test_one_epoch_dist(0)
     elif args.big_test:
         trainer.big_test_one_epoch_dist(0)
     else:

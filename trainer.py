@@ -257,6 +257,13 @@ class Trainer:
         mean_bert, mean_bleu, pred_captions, true_captions = self.get_big_bert_bleu()
 
         predictions, labels = self.get_data_for_prec_recall(pred_captions, true_captions)
+        self.metrics.save_pred_data(predictions)
+
+        if self.o.args.make_histograms:
+            self.metrics.create_preds_histogram()
+            self.metrics.create_labels_histogram()
+            return
+
         id, image, pred, actual = self.get_reference_image_data()
         total_acc, individual_acc = self.get_dist_accuracies(predictions, labels)
 
@@ -274,6 +281,8 @@ class Trainer:
 
         if not self.o.args.train:
             self.metrics.close_run_table()
+
+
     def get_dist_accuracies(self, predictions, labels):
 
         metric_individual = MulticlassAccuracy(average=None, num_classes=16)
