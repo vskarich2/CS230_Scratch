@@ -279,7 +279,7 @@ class Trainer:
         y_actu = pd.Series(labels, name='Actual')
         y_pred = pd.Series(predictions, name='Predicted')
         df_confusion = pd.crosstab(y_actu, y_pred)
-        df_confusion.to_csv("confusion", sep='\t')
+        df_confusion.to_csv("/root/CS230_Scratch/confusion.tsv", sep='\t')
         # plot_confusion_matrix(df_confusion)
         # plt.savefig('foo.png')
 
