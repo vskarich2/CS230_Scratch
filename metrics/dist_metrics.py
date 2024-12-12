@@ -16,15 +16,15 @@ class DistMetrics():
         wandb.log({f"Metrics Summary": self.run_table})
 
     def create_preds_histogram(self):
-        hist_data = [[] for _ in range(21)]
+
 
         # Put data in list of lists format for wandb histogram
-        [hist_data[int(d)].extend([int(d)]) for d in self.pred_distances if d < 21.0]
-        # Filter empty lists
-        col = [l for l in hist_data if len(l) > 0]
+        test_distances = [2,3,6,3,3,4,1,2,6,8,3,4,5,8,1,2,7,9]
+        distances = [[int(d)] for d in test_distances if d < 21.0]
+
         col_name = "distances"
 
-        table = wandb.Table(data=col, columns=[col_name])
+        table = wandb.Table(data=distances, columns=[col_name])
         wandb.log({'distance_preds': wandb.plot.histogram(table, col_name,
                                                            title="Distances in Predictions")})
 
@@ -37,12 +37,12 @@ class DistMetrics():
         df.dropna(axis=0, how='any', inplace=True)
         labels = list(df['distance'])
         self.labeled_distances = labels
-        hist_data = [[] for _ in range(21)]
+
 
         # Put data in list of lists format for wandb histogram
-        [hist_data[int(d)].extend([int(d)]) for d in labels if d < 21.0]
+        col = [[int(d)] for d in labels if d < 21.0]
         # Filter empty lists
-        col = [l for l in hist_data if len(l) > 0]
+
         col_name = "distances"
         table = wandb.Table(data=col, columns=[col_name])
         wandb.log({'distance_labels': wandb.plot.histogram(table, col_name,
@@ -50,7 +50,8 @@ class DistMetrics():
 
     def close_epoch_table(self, epoch):
         wandb.log({f"Epoch: {epoch}": self.epoch_table})
-
+    def save_preds(self, epoch):
+        pass
     def update_run_table(self,
                          epoch,
                          id,

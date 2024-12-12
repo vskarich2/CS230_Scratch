@@ -205,6 +205,9 @@ class UnifiedAttentionModel(nn.Module):
         input_embeddings = self.create_unified_input(token_ids, enriched_image)
 
         hidden_state = input_embeddings
+
+        # This should be encapsulated in a function that can be overridden in
+        # a test model class that just returns hard-coded values.
         for i in range(self.m_cnfg.depth):
             hidden_state = self.transformer.h[i](hidden_state)
 

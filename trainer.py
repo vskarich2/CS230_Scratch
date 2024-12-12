@@ -206,12 +206,12 @@ class Trainer:
         bleu_scores = []
         pred_captions = []
         true_captions = []
+        total = self.o.args.big_test_count
 
-        for i in range(self.o.args.big_test_count):
-            test = self.df_v.sample(n=1).values[0]
-            test_img: PosixPath
-            image_id: int
-            test_img, actual_caption, image_id = test[0], test[1], test[2]
+        df_sample = self.df_v.sample(total, replace=True).reset_index(drop=True)
+        sample = [(row[0], row[1], row[2]) for row in df_sample[['image', 'caption', 'img_url']].to_numpy()]
+
+        for test_img, actual_caption, image_id in sample:
 
             gen_caption = self.generate_caption(
                 test_img,
@@ -253,15 +253,37 @@ class Trainer:
 
     def big_test_one_epoch_dist(self, epoch):
         # This function is for writing run-level, a row for each epoch, to wandb
+        from matplotlib import pyplot as plt
+        import pandas as pd
+
+        def plot_confusion_matrix(df_confusion, title='Confusion matrix', cmap=plt.cm.gray_r):
+            plt.matshow(df_confusion, cmap=cmap)  # imshow
+            plt.title(title)
+            plt.colorbar()
+            tick_marks = np.arange(len(df_confusion.columns))
+            plt.xticks(tick_marks, df_confusion.columns, rotation=45)
+            plt.yticks(tick_marks, df_confusion.index)
+            # plt.tight_layout()
+            plt.ylabel(df_confusion.index.name)
+            plt.xlabel(df_confusion.columns.name)
+            plt.savefig('foo.png')
+
 
         mean_bert, mean_bleu, pred_captions, true_captions = self.get_big_bert_bleu()
 
         predictions, labels = self.get_data_for_prec_recall(pred_captions, true_captions)
         self.metrics.save_pred_data(predictions)
 
+        y_actu = pd.Series(labels, name='Actual')
+        y_pred = pd.Series(predictions, name='Predicted')
+        df_confusion = pd.crosstab(y_actu, y_pred)
+        plot_confusion_matrix(df_confusion)
+        plt.savefig('foo.png')
+
         if self.o.args.make_histograms:
-            self.metrics.create_preds_histogram()
-            self.metrics.create_labels_histogram()
+            #self.metrics.create_preds_histogram()
+            #self.metrics.create_labels_histogram()
+            #self.metrics.save_preds()
             return
 
         id, image, pred, actual = self.get_reference_image_data()
