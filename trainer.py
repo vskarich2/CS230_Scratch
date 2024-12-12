@@ -253,7 +253,9 @@ class Trainer:
 
     def big_test_one_epoch_dist(self, epoch):
         # This function is for writing run-level, a row for each epoch, to wandb
+        import matplotlib
         from matplotlib import pyplot as plt
+        matplotlib.use('Agg')
         import pandas as pd
 
         def plot_confusion_matrix(df_confusion, title='Confusion matrix', cmap=plt.cm.gray_r):
@@ -272,7 +274,7 @@ class Trainer:
         mean_bert, mean_bleu, pred_captions, true_captions = self.get_big_bert_bleu()
 
         predictions, labels = self.get_data_for_prec_recall(pred_captions, true_captions)
-        self.metrics.save_pred_data(predictions)
+        #self.metrics.save_pred_data(predictions)
 
         y_actu = pd.Series(labels, name='Actual')
         y_pred = pd.Series(predictions, name='Predicted')
