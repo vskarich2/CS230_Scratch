@@ -279,8 +279,9 @@ class Trainer:
         y_actu = pd.Series(labels, name='Actual')
         y_pred = pd.Series(predictions, name='Predicted')
         df_confusion = pd.crosstab(y_actu, y_pred)
-        plot_confusion_matrix(df_confusion)
-        plt.savefig('foo.png')
+        df_confusion.to_csv("confusion", sep='\t')
+        # plot_confusion_matrix(df_confusion)
+        # plt.savefig('foo.png')
 
         if self.o.args.make_histograms:
             #self.metrics.create_preds_histogram()
