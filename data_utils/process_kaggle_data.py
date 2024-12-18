@@ -1,5 +1,9 @@
 import os
 
+from data_utils.sample_coco2017_data import SampleCoco2017Data
+from data_utils.sample_data import SampleData
+
+
 def process_captions():
     TEST_IMG_COUNT = 10000
     count = 0
@@ -36,21 +40,9 @@ def process_captions():
         for id, caption in lines_dict.items():
             the_file.write(id + "," + caption + '\n')
 
-def create_histogram():
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    file = 'data_utils/distance_captions.tsv'
-    df = pd.read_csv(file, delimiter='\t')
-    df.dropna(axis=0, how='any', inplace=True)
-    labels = list(df['distance'])
-
-
-
-
-
 
 if __name__ == '__main__':
-    create_histogram()
-    #process_captions()
+    sd = SampleCoco2017Data(sample_size=5)
+    sd.sample_the_data()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+

@@ -268,19 +268,20 @@ class Trainer:
             # plt.tight_layout()
             plt.ylabel(df_confusion.index.name)
             plt.xlabel(df_confusion.columns.name)
-            plt.savefig('foo.png')
 
 
-        mean_bert, mean_bleu, pred_captions, true_captions = self.get_big_bert_bleu()
 
-        predictions, labels = self.get_data_for_prec_recall(pred_captions, true_captions)
-        #self.metrics.save_pred_data(predictions)
+        # mean_bert, mean_bleu, pred_captions, true_captions = self.get_big_bert_bleu()
+        #
+        # predictions, labels = self.get_data_for_prec_recall(pred_captions, true_captions)
+        # #self.metrics.save_pred_data(predictions)
 
-        y_actu = pd.Series(labels, name='Actual')
-        y_pred = pd.Series(predictions, name='Predicted')
-        df_confusion = pd.crosstab(y_actu, y_pred)
-        df_confusion.to_csv("/root/CS230_Scratch/confusion.tsv", sep='\t')
-        # plot_confusion_matrix(df_confusion)
+        # y_actu = pd.Series(labels, name='Actual')
+        # y_pred = pd.Series(predictions, name='Predicted')
+        # df_confusion = pd.crosstab(y_actu, y_pred)
+        df_confusion = pd.read_csv('/Users/vskarich/Downloads/confusion.tsv', sep='\t')
+        #df_confusion.to_csv("/root/CS230_Scratch/confusion.tsv", sep='\t')
+        plot_confusion_matrix(df_confusion)
         # plt.savefig('foo.png')
 
         if self.o.args.make_histograms:
